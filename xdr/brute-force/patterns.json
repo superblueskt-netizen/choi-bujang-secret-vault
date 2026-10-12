@@ -1,0 +1,25 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "brute-force",
+  "source": "MITRE ATT&CK T1110 Brute Force (https://attack.mitre.org/techniques/T1110/)",
+  "patterns": [
+    {
+      "name": "password-guessing-burst",
+      "technique": "T1110.001",
+      "condition": "같은 출발 주소에서 짧은 시간(몇 분) 안에 로그인 실패가 30건 이상 연속",
+      "evidence": "T1110.001 Password Guessing: 한 계정에 비밀번호를 반복 대입하면 짧은 시간에 같은 주소의 인증 실패가 몰린다."
+    },
+    {
+      "name": "password-spraying",
+      "technique": "T1110.003",
+      "condition": "같은 출발 주소가 여러 계정(5개 이상)에 같은 비밀번호로 로그인 실패를 넣음",
+      "evidence": "T1110.003 Password Spraying: 잠금을 피하려고 흔한 비밀번호 하나를 여러 계정에 돌려 넣으므로 여러 계정에 걸친 같은 비밀번호 실패가 신호다."
+    },
+    {
+      "name": "repeated-failures-low-volume",
+      "technique": "T1110",
+      "condition": "로그인 실패가 3~29건으로 반복되지만 대량·다계정 신호는 없음",
+      "evidence": "T1110 Brute Force 탐지 권고: 반복된 인증 실패는 대입 시도의 초기 신호일 수 있으나 사용자의 단순 오타와 구별되지 않아 확인이 필요하다."
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "schema": "aleph.xdr.deny-rules.v1",
+  "rules": [
+    {
+      "ruleId": "xdr.brute-force.deny.203.0.113.10",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.10"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-01",
+        "bf-02"
+      ],
+      "patterns": [
+        "password-guessing-burst",
+        "password-spraying"
+      ],
+      "confidence": 0.93,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.198.51.100.20",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.20"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-03"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.9,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.192.0.2.30",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.30"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-04"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.94,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.203.0.113.21",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.21"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-05"
+      ],
+      "patterns": [
+        "password-spraying"
+      ],
+      "confidence": 0.97,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.198.51.100.44",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.44"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-06"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.96,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.203.0.113.15",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.15"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-07"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.91,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.192.0.2.18",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.18"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-08"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.98,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.198.51.100.8",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.8"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-09"
+      ],
+      "patterns": [
+        "password-spraying"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.brute-force.deny.203.0.113.40",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.40"
+      },
+      "reasonCode": "xdr_brute_force",
+      "evidenceAlertIds": [
+        "bf-10"
+      ],
+      "patterns": [
+        "password-guessing-burst"
+      ],
+      "confidence": 0.98,
+      "createdAt": "2026-10-12T05:12:41.563Z",
+      "expiresAt": "2026-10-12T06:12:41.563Z"
+    }
+  ]
+}

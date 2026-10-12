@@ -1,0 +1,179 @@
+{
+  "schema": "aleph.xdr.result.v1",
+  "moduleKey": "brute-force",
+  "decisions": [
+    {
+      "alertId": "bf-01",
+      "action": "block",
+      "confidence": 0.93,
+      "reason": "password-guessing-burst (T1110.001): 실패 48건"
+    },
+    {
+      "alertId": "bf-02",
+      "action": "block",
+      "confidence": 0.92,
+      "reason": "password-spraying (T1110.003): 계정 8개에 대입"
+    },
+    {
+      "alertId": "bf-03",
+      "action": "block",
+      "confidence": 0.9,
+      "reason": "password-guessing-burst (T1110.001): 실패 36건"
+    },
+    {
+      "alertId": "bf-04",
+      "action": "block",
+      "confidence": 0.94,
+      "reason": "password-guessing-burst (T1110.001): 실패 52건"
+    },
+    {
+      "alertId": "bf-05",
+      "action": "block",
+      "confidence": 0.97,
+      "reason": "password-spraying (T1110.003): 계정 20개에 대입"
+    },
+    {
+      "alertId": "bf-06",
+      "action": "block",
+      "confidence": 0.96,
+      "reason": "password-guessing-burst (T1110.001): 실패 61건"
+    },
+    {
+      "alertId": "bf-07",
+      "action": "block",
+      "confidence": 0.91,
+      "reason": "password-guessing-burst (T1110.001): 실패 40건"
+    },
+    {
+      "alertId": "bf-08",
+      "action": "block",
+      "confidence": 0.98,
+      "reason": "password-guessing-burst (T1110.001): 실패 70건"
+    },
+    {
+      "alertId": "bf-09",
+      "action": "block",
+      "confidence": 0.95,
+      "reason": "password-spraying (T1110.003): 계정 15개에 대입"
+    },
+    {
+      "alertId": "bf-10",
+      "action": "block",
+      "confidence": 0.98,
+      "reason": "password-guessing-burst (T1110.001): 실패 90건"
+    },
+    {
+      "alertId": "bf-11",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "repeated-failures-low-volume (T1110): 실패 4건, 확인 필요"
+    },
+    {
+      "alertId": "bf-12",
+      "action": "alert",
+      "confidence": 0.7,
+      "reason": "repeated-failures-low-volume (T1110): 실패 6건, 확인 필요"
+    },
+    {
+      "alertId": "bf-13",
+      "action": "alert",
+      "confidence": 0.57,
+      "reason": "repeated-failures-low-volume (T1110): 실패 3건, 확인 필요"
+    },
+    {
+      "alertId": "bf-14",
+      "action": "alert",
+      "confidence": 0.63,
+      "reason": "repeated-failures-low-volume (T1110): 실패 5건, 확인 필요"
+    },
+    {
+      "alertId": "bf-15",
+      "action": "alert",
+      "confidence": 0.65,
+      "reason": "repeated-failures-low-volume (T1110): 실패 4건, 확인 필요"
+    },
+    {
+      "alertId": "bf-16",
+      "action": "alert",
+      "confidence": 0.57,
+      "reason": "repeated-failures-low-volume (T1110): 실패 3건, 확인 필요"
+    },
+    {
+      "alertId": "bf-17",
+      "action": "alert",
+      "confidence": 0.6,
+      "reason": "repeated-failures-low-volume (T1110): 실패 4건, 확인 필요"
+    },
+    {
+      "alertId": "bf-18",
+      "action": "alert",
+      "confidence": 0.75,
+      "reason": "repeated-failures-low-volume (T1110): 실패 8건, 확인 필요"
+    },
+    {
+      "alertId": "bf-19",
+      "action": "alert",
+      "confidence": 0.57,
+      "reason": "repeated-failures-low-volume (T1110): 실패 3건, 확인 필요"
+    },
+    {
+      "alertId": "bf-20",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-21",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-22",
+      "action": "record",
+      "confidence": 0.15,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-23",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-24",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-25",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-26",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-27",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    },
+    {
+      "alertId": "bf-28",
+      "action": "record",
+      "confidence": 0.02,
+      "reason": "일치 패턴 없음: 정상 인증 이벤트로 기록"
+    }
+  ],
+  "counts": {
+    "block": 10,
+    "alert": 9,
+    "record": 9
+  }
+}
