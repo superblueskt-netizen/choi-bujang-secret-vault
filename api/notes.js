@@ -10,8 +10,8 @@ export default async function handler(request, response) {
     response.setHeader('Allow', 'GET');
     return response.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   }
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
+  const url = process.env.SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !key) {
     console.error('notes: 서버 환경변수가 설정되지 않았습니다.');
     return response.status(500).json({ error: 'SERVER_NOT_CONFIGURED' });
@@ -19,12 +19,14 @@ export default async function handler(request, response) {
   const supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data, error } = await supabase
+  const { data, error, status } = await supabase
     .from('vault_notes')
     .select('title, content')
     .order('id', { ascending: true });
   if (error) {
-    console.error('notes: 자료를 읽지 못했습니다.', error.code ?? 'unknown');
+    // 상태 코드와 Supabase 오류 문구만 남깁니다. 키 값은 기록하지 않습니다.
+    const message = String(error.message ?? '').replaceAll(key, '[redacted]').slice(0, 200);
+    console.error('notes: 자료를 읽지 못했습니다.', status, error.code ?? 'no-code', message);
     return response.status(502).json({ error: 'NOTES_UNAVAILABLE' });
   }
   return response.status(200).json({ notes: data });
