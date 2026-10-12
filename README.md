@@ -23,3 +23,40 @@
 [AGENTS.md](AGENTS.md)를 먼저 읽히고 한 번에 한 제작 단위만 요청하세요. 2단계부터는 자료 보호를 구현할 때 `public/data.json`을 복사하는 1단계 빌드 흐름도 함께 바꿔야 합니다. 3단계 이후의 로그인, 허용 경로, 5단계의 원본 API 주소, 6단계 이후 정책 규칙은 해당 단계 원고와 계약에 맞춰 추가합니다. 비밀번호·토큰·서버 전용 키·실제 학생 기록을 코드, Git, 제출 묶음에 넣지 않습니다.
 
 `src/decider.mjs`와 `src/detect.mjs`의 로컬 시험은 반 엔진이나 운영 심판의 결과가 아닙니다. 1단계 이후 제출 묶음 계약 `aleph.defense.submission.v2`는 `scripts/bundle.mjs`에 남아 있으며, 코딩 도구가 해당 단계의 최신 배포 주소와 Git 원격을 맞춘 뒤 사용합니다.
+
+## 단계 기록
+
+- **1단계:** Deploy 버튼으로 공개 저장소와 Vercel 배포를 만들었습니다. 배포 주소는 `https://choi-bujang-secret-vault-five-eta.vercel.app/`입니다. `/data.json`에 가상 메모 네 건이 공개된 상태를 확인했습니다.
+- **2단계 「자료를 코드 밖으로 옮깁니다」:** 아래 내용이 현재 상태입니다.
+
+## 2단계: 현재 작동하는 기능
+
+- 가상 메모는 학습용 Supabase 테이블 `vault_notes`에 있습니다. 저장소의 `data.json`과 `public/data.json`은 지웠고, 빌드도 더 이상 공개 `data.json`을 만들지 않습니다. 둘 중 하나가 다시 생기면 빌드가 멈춥니다.
+- 화면(`/`)은 Vercel 서버 함수 `api/notes.js`(`/api/notes`)를 통해 메모 네 건을 읽습니다.
+- 서버 함수는 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 Vercel 환경변수에서만 읽습니다. 키는 브라우저 파일·응답·로그에 넣지 않습니다. 오류가 나도 오류 이름만 돌려줍니다.
+- 모든 응답에 보안 헤더 `X-Content-Type-Options: nosniff`를 붙입니다(`vercel.json`의 `headers`).
+- 빌드는 `aleph.config.json`의 `step`이 2 이상일 때 돌아가고, 배포마다 `/aleph.json`(저장소·커밋·주소·단계)을 만듭니다.
+
+### 다시 실행하는 방법
+
+1. Supabase 대시보드 → SQL Editor에 `supabase/step2-notes.local.sql`을 붙여넣고 Run을 누릅니다. 이 파일은 가상 메모 문장을 담고 있어서 `.gitignore`로 Git에서 뺐습니다. 테이블은 RLS가 켜져 있고 정책이 없어서, `anon`·`authenticated`는 읽을 수 없습니다. `owner_id uuid` 칸은 있지만 `auth.users` 외래키는 걸지 않았습니다.
+2. Vercel → Settings → Environment Variables에 `SUPABASE_URL`과 `SUPABASE_SECRET_KEY`를 학생이 직접 넣습니다. 값은 코드·Git·채팅에 적지 않습니다. 넣은 뒤에는 Redeploy를 누릅니다.
+3. 로컬 확인: `npm run build -- --local`
+
+## 남은 약점: 공개 서버 API
+
+`/api/notes`는 **아직 로그인 없이 누구나 부를 수 있는 공개 주소**입니다. 키는 서버에 숨겼지만, 함수가 받는 요청을 가리지 않으므로 가상 메모 네 건은 여전히 누구에게나 내려갑니다. 그래서 3단계 전까지는 가상 메모만 둡니다. 로그인 확인은 3단계에서 붙입니다.
+
+## 노출 확인 절차 (가상 메모 문장 검색)
+
+메모 문장은 이 README에 적지 않습니다. 검색어는 메모 문장에 공통으로 들어가는 앞부분 `실습용 가상`을 씁니다.
+
+1. **현재 배포 정적 파일:** 시크릿 창에서 `/data.json`을 엽니다. 404가 나오거나 메모가 0건이어야 합니다. `/`의 페이지 소스(Ctrl+U)에서 `실습용 가상`을 찾았을 때 결과가 없어야 합니다. 카드는 API로 불러오므로 소스에는 없습니다.
+2. **GitHub 최신 파일:** 저장소 검색창에 `"실습용 가상"`을 입력합니다. 로컬에서는 `git grep -n "실습용 가상" HEAD`를 실행합니다. 결과가 없어야 합니다.
+3. **공개 API (약점 관찰):** 시크릿 창에서 `/api/notes`를 엽니다. 3단계 전까지는 메모 네 건이 보이는 것이 현재 상태입니다. 이것은 막힌 것이 아니라 남은 약점입니다.
+
+검색 결과와 공개 API의 결과는 `npm run bundle`의 자기 점검(`static_data_json_read`, `anonymous_api_notes_read`)에도 따로 기록됩니다. 이 점검은 학생의 실제 요청 결과이며, 심판의 판정이 아닙니다.
+
+### 과거 노출은 해소되지 않았습니다
+
+최신 파일에서 메모를 지워도 **1단계 공개 커밋(`f2aa3b5`)과 그 커밋의 옛 Vercel 배포는 그대로 남아 있습니다.** 누구나 GitHub 커밋 기록이나 옛 배포 주소로 그때의 `data.json`을 볼 수 있습니다. 이미 복제·보관된 사본도 회수할 수 없습니다. 따라서 이번 단계는 "앞으로의 노출을 줄인 것"이지 과거 노출을 없앤 것이 아닙니다. 실제 자료였다면 노출된 값을 모두 폐기하고 교체해야 합니다.
