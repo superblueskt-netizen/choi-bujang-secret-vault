@@ -29,7 +29,8 @@
 - **1단계:** Deploy 버튼으로 공개 저장소와 Vercel 배포를 만들었습니다. 배포 주소는 `https://choi-bujang-secret-vault-five-eta.vercel.app/`입니다. `/data.json`에 가상 메모 네 건이 공개된 상태를 확인했습니다.
 - **2단계 「자료를 코드 밖으로 옮깁니다」:** 커밋 `d15ddfe`(2단계 저장점)과 `40001c2`(오류 기록 보강). 메모를 Supabase로 옮기고 공개 `data.json`을 없앴습니다.
 - **3단계 「진짜 로그인을 붙입니다」:** 커밋 `c41064f`(3단계 저장점). 로그인·토큰 검사·메모 CRUD API.
-- **4단계 「로그인해도 내 자료만 보이게 합니다」:** 「4단계 저장점」 커밋. 아래 「4단계」 절이 현재 상태입니다.
+- **4단계 「로그인해도 내 자료만 보이게 합니다」:** 커밋 `64bfad7`(4단계 저장점). 커밋 뒤 학습 DB에 `step4-owners.local.sql`(A 4건·B 1건)과 RLS·최소 권한 SQL을 실제로 실행했습니다.
+- **5단계 「자료 요청을 서버 한곳으로 모읍니다」:** 「5단계 저장점」 커밋. 아래 「5단계」 절이 현재 상태입니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -89,7 +90,7 @@
 
 3단계 때 `GET`·`PUT`·`DELETE /api/notes/:id`는 로그인 여부만 확인했습니다. 로그인한 B가 A 메모의 `id`를 알면 읽고 고치고 지울 수 있었습니다. 4단계에서 소유자 검사로 막았습니다.
 
-## 4단계: 현재 작동하는 기능
+## 4단계에서 만든 것 (5단계에도 유지)
 
 - **API 소유자 검사** (`src/notes-api.mjs`): 서버가 `src/verify-login.mjs`로 확인한 사용자 ID와 DB 행의 `owner_id`를 비교하고, 맞지 않으면 기본 거부합니다. URL·본문의 `owner_id`·`userId`는 소유자 판단에 쓰지 않습니다.
   - `GET /api/notes`: 본인 메모만 돌려줍니다.
@@ -107,3 +108,23 @@
 1. A로 로그인합니다. 가상 메모 네 건이 보이고 추가·수정·삭제가 되어야 합니다.
 2. B로 로그인합니다. 자기 메모만 보여야 합니다. 개발자 도구 콘솔에서 A 메모의 id로 `fetch('/api/notes/<A id>', {headers:{Authorization:'Bearer <B 토큰>'}})`를 보내면 `404`가 나와야 합니다. `PUT`·`DELETE`도 같습니다.
 3. `npm run bundle`의 자기 점검은 무로그인·가짜 토큰 거부와 anon 키 Data API 직접 읽기를 실제로 보냅니다. B 토큰이 필요한 교차 접근은 **미실행**으로 기록합니다.
+
+## 5단계: 현재 작동하는 기능
+
+- **브라우저는 서버 함수만 부릅니다.** `public/index.html`의 Supabase 호출은 로그인용(`signInWithPassword`·`signOut`·`getSession`·`onAuthStateChange`)뿐이고, 메모 읽기·추가·수정·삭제는 모두 `/api/notes`와 `/api/notes/:id`로 갑니다. 그래서 브라우저 코드는 바꾸지 않았습니다.
+- **서버 함수 확인** (배포 주소, A 로그인 세션, 2026-10-12): 목록 `200`(가상 메모 4건), 추가 `201 {id}`, 한 건 `200 {id,title,body}`, 수정 `200`, 삭제 `200`, 지운 뒤 한 건 `404`, 목록 다시 4건. 시험 메모는 만들었다가 지웠습니다.
+- **남아 있던 길 (적용 전 관찰):** 공개 키만으로 원본 주소를 부르면 이미 `401`(42501)이었습니다. 하지만 **A의 로그인 토큰을 붙여 원본 주소를 직접 부르면 `200`, 자기 행 4개가 내려왔습니다.** 4단계에서 authenticated에 준 권한 때문입니다.
+- **직접 권한 회수 SQL (제안, 학생이 검토 후 실행):** `supabase/step5-revoke-direct.sql`은 `vault_notes` 한 테이블에서 `PUBLIC`·`anon`·`authenticated` 권한을 모두 거둡니다. 서버 함수가 쓰는 `service_role` 권한과 RLS·4단계 정책은 그대로 둡니다. 적용 전후 `role_table_grants`·`has_table_privilege`를 한 표로 비교합니다.
+- **원본 자료 주소:** `aleph.config.json`의 `originalApiUrl` = `https://giixryoqzyamfedhnnpt.supabase.co/rest/v1/vault_notes` (쿼리 없음).
+- 서버 함수의 로그인 검사(`src/verify-login.mjs`), 소유자 검사, 서버 전용 설정(`SUPABASE_URL`·`SUPABASE_SECRET_KEY`)은 바꾸지 않았습니다.
+
+### 확인 방법
+
+1. SQL 적용 뒤 결과 표에서 `anon`·`authenticated`의 after 칸이 비어 있고 `service_role`은 그대로여야 합니다.
+2. 로그인한 화면의 개발자 도구 콘솔에서 원본 주소를 공개 키와 내 토큰으로 직접 부르면 `401`/`403` 권한 오류여야 합니다. 공개 키만으로 불러도 마찬가지입니다.
+3. 화면에서 A의 메모 읽기·추가·수정·삭제는 그대로 되어야 합니다(서버 함수 경유).
+4. `npm run bundle`은 공개 키로 `originalApiUrl`을 직접 부른 결과를 기록합니다.
+
+### 남은 점
+
+- 화면 코드에는 아직 Supabase 공개 키(`sb_publishable_…`)가 있습니다. 로그인까지 서버 함수로 옮기면 없앨 수 있지만, 로그인이 깨질 위험이 있어 이번에는 하지 않았습니다.

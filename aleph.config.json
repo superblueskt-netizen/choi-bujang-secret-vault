@@ -1,5 +1,5 @@
 {
-  "step": 4,
+  "step": 5,
   "repoUrl": "https://github.com/superblueskt-netizen/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-five-eta.vercel.app/",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -16,7 +16,7 @@
     "PUT /api/notes/:id",
     "DELETE /api/notes/:id"
   ],
-  "originalApiUrl": null,
+  "originalApiUrl": "https://giixryoqzyamfedhnnpt.supabase.co/rest/v1/vault_notes",
   "restoreRoute": null,
   "publicDataApiKey": "sb_publishable_DJ4O37tcMRnxkkUQWaKyvQ_rvq9urx6"
 }

@@ -4,6 +4,7 @@ export async function runAttackChecks(config) {
   if (config.step === 2) return runStep2Checks(config);
   if (config.step === 3) return runStep3Checks(config);
   if (config.step === 4) return runStep4Checks(config);
+  if (config.step === 5) return runStep5Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -117,4 +118,21 @@ async function runStep4Checks(config) {
   checks.push({ attackId: 'cross_owner_note_access', expected: 'B 토큰으로 A 메모 GET·PUT·DELETE는 거부',
     observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/owner.test.mjs 로컬 시험(가짜 DB)에서만 404 확인' });
   return checks;
+}
+
+// 5단계: 원본 자료 주소(originalApiUrl)를 공개 키로 직접 불러 메모가 없어야 합니다. 나머지는 4단계 점검을 이어 씁니다.
+async function runStep5Checks(config) {
+  const base = (await runStep4Checks(config))
+    .filter((item) => !['deployment_identity_present', 'anon_data_api_read'].includes(item.attackId));
+  const app = appUrl(config);
+  const identity = await anonymousGet(app, '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 5 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  if (typeof config.originalApiUrl === 'string' && typeof config.publicDataApiKey === 'string') {
+    const direct = await anonymousGet(new URL(config.originalApiUrl), '', { headers: { apikey: config.publicDataApiKey } });
+    base.push({ attackId: 'original_api_direct_read', expected: '공개 키로 원본 자료 주소를 직접 부르면 메모 없음(권한 오류)',
+      observed: unreached(direct) ?? `공개 키 GET originalApiUrl HTTP ${direct.status} · `
+        + (Array.isArray(direct.body) ? `행 ${direct.body.length}개 노출` : `오류 ${direct.body?.code ?? direct.body?.message ?? '없음'}`) });
+  }
+  return base;
 }
