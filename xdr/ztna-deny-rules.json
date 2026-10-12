@@ -155,6 +155,127 @@
       "confidence": 0.98,
       "createdAt": "2026-10-12T05:12:41.563Z",
       "expiresAt": "2026-10-12T06:12:41.563Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.203.0.113.10",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.10"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-01",
+        "wi-02"
+      ],
+      "patterns": [
+        "sql-injection-repeated",
+        "script-injection-repeated"
+      ],
+      "confidence": 0.94,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.198.51.100.15",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.15"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-03"
+      ],
+      "patterns": [
+        "path-traversal-repeated"
+      ],
+      "confidence": 0.91,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.192.0.2.15",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.15"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-04"
+      ],
+      "patterns": [
+        "sql-injection-repeated"
+      ],
+      "confidence": 0.97,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.203.0.113.18",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.18"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-05"
+      ],
+      "patterns": [
+        "sql-injection-repeated"
+      ],
+      "confidence": 0.98,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.198.51.100.18",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.18"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-06"
+      ],
+      "patterns": [
+        "command-separator-injection-repeated"
+      ],
+      "confidence": 0.93,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.192.0.2.21",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.21"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-07"
+      ],
+      "patterns": [
+        "path-traversal-repeated"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.web-injection.deny.203.0.113.22",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.22"
+      },
+      "reasonCode": "xdr_web_injection",
+      "evidenceAlertIds": [
+        "wi-08"
+      ],
+      "patterns": [
+        "sql-injection-repeated"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-12T05:39:25.764Z",
+      "expiresAt": "2026-10-12T06:39:25.764Z"
     }
   ]
 }

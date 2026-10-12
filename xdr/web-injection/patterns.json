@@ -1,0 +1,37 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "web-injection",
+  "source": "MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/)",
+  "patterns": [
+    {
+      "name": "sql-injection-repeated",
+      "technique": "T1190",
+      "condition": "요청 인자에 SQL 구문(이어 붙이기·OR·SELECT 연결) 표기가 있고 같은 주소에서 5번 이상 반복",
+      "evidence": "T1190: 공격자는 공개 웹 앱의 입력값에 SQL 구문을 넣어 데이터베이스를 조작하며(SQL injection), 같은 주소의 반복 시도가 대표 신호다."
+    },
+    {
+      "name": "script-injection-repeated",
+      "technique": "T1190",
+      "condition": "요청 인자에 스크립트 태그·삽입 표식이 있고 같은 주소에서 5번 이상 반복",
+      "evidence": "T1190: 공개 웹 앱의 입력 검증 약점을 노려 스크립트를 끼워 넣는 시도는 외부 공개 앱 악용의 한 형태다."
+    },
+    {
+      "name": "path-traversal-repeated",
+      "technique": "T1190",
+      "condition": "경로 인자에 상위 폴더 거슬러 올라가기(../) 표기가 여러 단계로 들어 있고 5번 이상 반복",
+      "evidence": "T1190: 경로 입력을 조작해 앱 밖의 파일을 읽으려는 경로 이탈은 공개 웹 앱 취약점 악용으로 다뤄진다."
+    },
+    {
+      "name": "command-separator-injection-repeated",
+      "technique": "T1190",
+      "condition": "요청 인자에 명령 구분자 표기가 있고 연속 요청에서 5번 이상 반복",
+      "evidence": "T1190: 웹 입력을 통해 서버 명령을 이어 붙여 실행시키는 명령 주입도 공개 앱 악용 사례에 포함된다."
+    },
+    {
+      "name": "single-injection-like-request",
+      "technique": "T1190",
+      "condition": "주입처럼 보이는 표기·T1190 탐지 규칙이 한 번 걸렸지만 반복이 없음",
+      "evidence": "T1190 탐지 권고: 웹 요청의 비정상 입력은 탐지 대상이지만 한 번뿐인 표기는 수업명·따옴표 같은 정상 입력과 구별되지 않아 확인이 필요하다."
+    }
+  ]
+}
