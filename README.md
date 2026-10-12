@@ -28,7 +28,8 @@
 
 - **1단계:** Deploy 버튼으로 공개 저장소와 Vercel 배포를 만들었습니다. 배포 주소는 `https://choi-bujang-secret-vault-five-eta.vercel.app/`입니다. `/data.json`에 가상 메모 네 건이 공개된 상태를 확인했습니다.
 - **2단계 「자료를 코드 밖으로 옮깁니다」:** 커밋 `d15ddfe`(2단계 저장점)과 `40001c2`(오류 기록 보강). 메모를 Supabase로 옮기고 공개 `data.json`을 없앴습니다.
-- **3단계 「진짜 로그인을 붙입니다」:** 「3단계 저장점」 커밋. 아래 「3단계」 절이 현재 상태입니다.
+- **3단계 「진짜 로그인을 붙입니다」:** 커밋 `c41064f`(3단계 저장점). 로그인·토큰 검사·메모 CRUD API.
+- **4단계 「로그인해도 내 자료만 보이게 합니다」:** 「4단계 저장점」 커밋. 아래 「4단계」 절이 현재 상태입니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -61,7 +62,7 @@
 
 최신 파일에서 메모를 지워도 **1단계 공개 커밋(`f2aa3b5`)과 그 커밋의 옛 Vercel 배포는 그대로 남아 있습니다.** 누구나 GitHub 커밋 기록이나 옛 배포 주소로 그때의 `data.json`을 볼 수 있습니다. 이미 복제·보관된 사본도 회수할 수 없습니다. 따라서 이번 단계는 "앞으로의 노출을 줄인 것"이지 과거 노출을 없앤 것이 아닙니다. 실제 자료였다면 노출된 값을 모두 폐기하고 교체해야 합니다.
 
-## 3단계: 현재 작동하는 기능
+## 3단계에서 만든 것 (4단계에도 유지)
 
 - **로그인·로그아웃:** 첫 화면에서 Supabase Auth 이메일·비밀번호로 로그인합니다(공식 SDK `signInWithPassword`/`signOut`). 실패하면 화면에 이유가 나옵니다. 화면 코드에는 공개용 Project URL과 publishable key만 있습니다.
 - **서버 토큰 검사:** 모든 메모 API는 시작 틀의 `src/verify-login.mjs`로 `Authorization: Bearer` 토큰을 검사합니다. 토큰이 없거나 검사에 실패하면 자료 없이 `401 {"error":"LOGIN_REQUIRED"}`를 돌려줍니다. 브라우저가 보낸 `userId`·`role`·`owner_id`는 읽지 않습니다. 검사에 쓴 발급자 정보는 `aleph.config.json`의 `identityProvider`에 있습니다(비밀 키 없음).
@@ -84,6 +85,25 @@
 3. 틀린 비밀번호로 로그인하면 "로그인 실패: 이메일 또는 비밀번호가 맞지 않습니다."가 나와야 합니다.
 4. 브라우저 개발자 도구의 Sources에서 `sb_secret_`을 검색하면 결과가 없어야 합니다.
 
-### 남은 약점: 소유자 검사 없음 (4단계에서 막음)
+### (해소됨, 3단계 기록) 소유자 검사 없음
 
-로그인은 신원 확인일 뿐입니다. `GET`·`PUT`·`DELETE /api/notes/:id`는 로그인 여부만 확인하고 **메모 주인인지 확인하지 않습니다.** 로그인한 B가 A 메모의 `id`를 알면 읽고 고치고 지울 수 있습니다. B의 타인 메모 접근 결과는 4단계에서 기록합니다.
+3단계 때 `GET`·`PUT`·`DELETE /api/notes/:id`는 로그인 여부만 확인했습니다. 로그인한 B가 A 메모의 `id`를 알면 읽고 고치고 지울 수 있었습니다. 4단계에서 소유자 검사로 막았습니다.
+
+## 4단계: 현재 작동하는 기능
+
+- **API 소유자 검사** (`src/notes-api.mjs`): 서버가 `src/verify-login.mjs`로 확인한 사용자 ID와 DB 행의 `owner_id`를 비교하고, 맞지 않으면 기본 거부합니다. URL·본문의 `owner_id`·`userId`는 소유자 판단에 쓰지 않습니다.
+  - `GET /api/notes`: 본인 메모만 돌려줍니다.
+  - `POST /api/notes`: `owner_id`는 확인된 ID로 저장합니다. 본문에 다른 사람을 소유자로 적으면 `403`입니다.
+  - `GET·PUT·DELETE /api/notes/:id`: 기존 행을 먼저 읽어 본인 것이 아니면 `404`로 답합니다. 남의 메모와 없는 메모를 구별할 수 없게 하려는 것입니다. `PUT`은 `id`와 `owner_id` 조건으로만 고치고 `owner_id`를 쓰지 않아서, 새 행의 소유자도 본인으로 유지됩니다. 본문에 다른 소유자를 적으면 `403`입니다.
+  - 응답 모양은 그대로입니다. 한 건은 `{id,title,body}`, 수정 본문은 `{title,body}`입니다.
+- **로컬 시험:** `node --test test/owner.test.mjs`. 가짜 검사기와 메모리 DB로 A/B 자기 메모 CRUD 허용, 상대 메모 읽기·수정·삭제 404, 소유자 변경 403, 무로그인 401을 확인합니다. 실제 배포 판정이 아닙니다.
+- **학습용 SQL (제안, 학생이 검토 후 실행):**
+  - `supabase/step4-owners.sql`: 이메일로 `auth.users`의 ID를 찾아 가상 메모 네 건을 A 소유로 연결하고, B 소유 시험 메모 한 건을 넣습니다.
+  - `supabase/step4-rls.sql`: `vault_notes`에만 적용합니다. `PUBLIC`·`anon`·`authenticated` 권한을 모두 회수한 뒤 `authenticated`에 `SELECT·INSERT·UPDATE·DELETE`만 줍니다. 정책은 `auth.uid() = owner_id`입니다(`SELECT`·`DELETE`는 USING, `INSERT`는 WITH CHECK, `UPDATE`는 둘 다). 적용 전후 `information_schema.role_table_grants`와 `has_table_privilege` 비교 쿼리가 들어 있습니다.
+  - 앱 API는 서버 전용 키(service_role)를 쓰므로 RLS를 우회합니다. 앱의 1차 방어는 위 API 소유자 검사이고, RLS는 Data API 직접 접근을 막는 2차 방어입니다.
+
+### 확인 방법
+
+1. A로 로그인합니다. 가상 메모 네 건이 보이고 추가·수정·삭제가 되어야 합니다.
+2. B로 로그인합니다. 자기 메모만 보여야 합니다. 개발자 도구 콘솔에서 A 메모의 id로 `fetch('/api/notes/<A id>', {headers:{Authorization:'Bearer <B 토큰>'}})`를 보내면 `404`가 나와야 합니다. `PUT`·`DELETE`도 같습니다.
+3. `npm run bundle`의 자기 점검은 무로그인·가짜 토큰 거부와 anon 키 Data API 직접 읽기를 실제로 보냅니다. B 토큰이 필요한 교차 접근은 **미실행**으로 기록합니다.

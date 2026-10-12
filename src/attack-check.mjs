@@ -3,6 +3,7 @@
 export async function runAttackChecks(config) {
   if (config.step === 2) return runStep2Checks(config);
   if (config.step === 3) return runStep3Checks(config);
+  if (config.step === 4) return runStep4Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -93,4 +94,27 @@ async function runStep3Checks(config) {
     { attackId: 'deployment_identity_present', expected: '/aleph.json에 step 3 배포 식별 정보가 있음',
       observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` },
   ];
+}
+
+// 4단계: 무로그인 거부는 실제로 다시 확인하고, Data API는 anon(공개) 키로만 직접 찔러 봅니다.
+// B가 A 메모에 접근하는 시험은 B의 토큰이 있어야 하므로 bundle에서는 실행하지 않습니다(미실행으로 기록).
+async function runStep4Checks(config) {
+  const base = await runStep3Checks(config);
+  const checks = base.filter((item) => item.attackId !== 'deployment_identity_present');
+  const app = appUrl(config);
+  const identity = await anonymousGet(app, '/aleph.json');
+  checks.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 4 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  const issuer = config.identityProvider?.issuer;
+  const anonKey = config.publicDataApiKey;
+  if (typeof issuer === 'string' && typeof anonKey === 'string') {
+    const restUrl = new URL('/rest/v1/vault_notes?select=id', new URL(issuer).origin);
+    const direct = await anonymousGet(restUrl, '', { headers: { apikey: anonKey } });
+    checks.push({ attackId: 'anon_data_api_read', expected: 'anon 키로 Data API를 직접 읽으면 권한 오류',
+      observed: unreached(direct) ?? `anon 키 GET /rest/v1/vault_notes HTTP ${direct.status} · `
+        + (Array.isArray(direct.body) ? `행 ${direct.body.length}개 노출` : `오류 ${direct.body?.code ?? direct.body?.message ?? '없음'}`) });
+  }
+  checks.push({ attackId: 'cross_owner_note_access', expected: 'B 토큰으로 A 메모 GET·PUT·DELETE는 거부',
+    observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/owner.test.mjs 로컬 시험(가짜 DB)에서만 404 확인' });
+  return checks;
 }

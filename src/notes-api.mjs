@@ -1,6 +1,6 @@
-// 3단계 메모 API 공통 처리. 서버가 src/verify-login.mjs로 확인한 사용자 ID만 믿습니다.
-// 브라우저가 보낸 userId·role·owner_id는 읽지 않습니다.
-// 아직 소유자 검사는 하지 않습니다: 로그인한 B가 A 메모의 id를 알면 읽기·수정·삭제할 수 있습니다(4단계에서 막음).
+// 메모 API 공통 처리. 서버가 src/verify-login.mjs로 확인한 사용자 ID만 믿습니다.
+// 4단계: 읽기·추가·수정·삭제 모두 확인된 사용자 ID와 DB의 owner_id를 비교하고, 맞지 않으면 기본 거부합니다.
+// URL·본문의 owner_id·userId·role은 소유자 판단에 쓰지 않습니다.
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
@@ -10,6 +10,7 @@ const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.me
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const TABLE = 'vault_notes';
 const COLUMNS = 'id, title, body';
+const OWNER_FIELDS = ['owner_id', 'ownerId', 'userId', 'user_id'];
 
 let services;
 function getServices() {
@@ -26,6 +27,16 @@ function getServices() {
 }
 
 const send = (response, status, body) => response.status(status).json(body);
+const notFound = (response) => send(response, 404, { error: 'NOT_FOUND' });
+const publicNote = (row) => ({ id: row.id, title: row.title, body: row.body });
+
+// 본문에 다른 사람을 소유자로 적으면 거부합니다(자기 ID와 같으면 무시).
+function ownerChangeAttempt(input, userId) {
+  return OWNER_FIELDS.some((key) => input[key] !== undefined && input[key] !== userId);
+}
+
+// 테스트에서만 가짜 검사기·DB를 넣습니다.
+export function setServicesForTesting(fake) { services = fake; }
 
 function readBody(request) {
   let body = request.body;
@@ -87,6 +98,9 @@ export async function handleCollection(request, response) {
   const input = readBody(request);
   const note = input && cleanNote(input, { partial: false });
   if (!note) return send(response, 400, { error: 'INVALID_NOTE', message: 'title(1~120자)과 body(2000자 이하)를 확인하세요.' });
+  if (ownerChangeAttempt(input, ctx.userId)) {
+    return send(response, 403, { error: 'OWNER_MISMATCH', message: '다른 사용자를 소유자로 저장할 수 없습니다.' });
+  }
   if (input.id !== undefined && (typeof input.id !== 'string' || !UUID.test(input.id))) {
     return send(response, 400, { error: 'INVALID_ID', message: 'id는 UUID여야 합니다.' });
   }
@@ -97,7 +111,8 @@ export async function handleCollection(request, response) {
   return send(response, 201, { id });
 }
 
-// /api/notes/:id : GET 한 건, PUT 수정, DELETE 삭제 (로그인만 확인, 소유자 검사 없음)
+// /api/notes/:id : GET 한 건, PUT 수정, DELETE 삭제 — 모두 본인 메모만 허용
+// 남의 메모와 없는 메모는 똑같이 404로 답해 존재 여부를 알려 주지 않습니다.
 export async function handleItem(request, response, rawId) {
   if (!['GET', 'PUT', 'DELETE'].includes(request.method)) {
     response.setHeader('Allow', 'GET, PUT, DELETE');
@@ -106,21 +121,33 @@ export async function handleItem(request, response, rawId) {
   const ctx = await authenticate(request, response);
   if (!ctx) return;
   const id = typeof rawId === 'string' && UUID.test(rawId) ? rawId.toLowerCase() : null;
-  if (!id) return send(response, 404, { error: 'NOT_FOUND' });
-  if (request.method === 'GET') {
-    const { data, error } = await ctx.db.from(TABLE).select(COLUMNS).eq('id', id).maybeSingle();
-    if (error) return dbFailure(response, '읽기', error);
-    return data ? send(response, 200, data) : send(response, 404, { error: 'NOT_FOUND' });
-  }
+  if (!id) return notFound(response);
+
+  // 기존 행을 먼저 읽어 소유자를 서버에서 비교합니다.
+  const { data: row, error: readError } = await ctx.db.from(TABLE)
+    .select('id, title, body, owner_id').eq('id', id).maybeSingle();
+  if (readError) return dbFailure(response, '읽기', readError);
+  if (!row || row.owner_id !== ctx.userId) return notFound(response);
+
+  if (request.method === 'GET') return send(response, 200, publicNote(row));
+
   if (request.method === 'PUT') {
     const input = readBody(request);
+    if (input && ownerChangeAttempt(input, ctx.userId)) {
+      return send(response, 403, { error: 'OWNER_CHANGE_FORBIDDEN', message: '메모 소유자는 바꿀 수 없습니다.' });
+    }
     const note = input && cleanNote(input, { partial: true });
     if (!note) return send(response, 400, { error: 'INVALID_NOTE', message: 'title 또는 body를 확인하세요.' });
-    const { data, error } = await ctx.db.from(TABLE).update(note).eq('id', id).select(COLUMNS).maybeSingle();
+    // 기존 행 조건(id + owner_id)으로만 고치고, 새 행의 owner_id는 쓰지 않으므로 본인으로 유지됩니다.
+    const { data, error } = await ctx.db.from(TABLE).update(note)
+      .eq('id', id).eq('owner_id', ctx.userId).select('id, title, body, owner_id').maybeSingle();
     if (error) return dbFailure(response, '수정', error);
-    return data ? send(response, 200, data) : send(response, 404, { error: 'NOT_FOUND' });
+    if (!data || data.owner_id !== ctx.userId) return notFound(response);
+    return send(response, 200, publicNote(data));
   }
-  const { data, error } = await ctx.db.from(TABLE).delete().eq('id', id).select('id').maybeSingle();
+
+  const { data, error } = await ctx.db.from(TABLE).delete()
+    .eq('id', id).eq('owner_id', ctx.userId).select('id').maybeSingle();
   if (error) return dbFailure(response, '삭제', error);
-  return data ? send(response, 200, { id: data.id, deleted: true }) : send(response, 404, { error: 'NOT_FOUND' });
+  return data ? send(response, 200, { id: data.id, deleted: true }) : notFound(response);
 }
