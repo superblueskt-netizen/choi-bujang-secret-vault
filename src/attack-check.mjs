@@ -5,6 +5,7 @@ export async function runAttackChecks(config) {
   if (config.step === 3) return runStep3Checks(config);
   if (config.step === 4) return runStep4Checks(config);
   if (config.step === 5) return runStep5Checks(config);
+  if (config.step === 6) return runStep6Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -134,5 +135,27 @@ async function runStep5Checks(config) {
       observed: unreached(direct) ?? `공개 키 GET originalApiUrl HTTP ${direct.status} · `
         + (Array.isArray(direct.body) ? `행 ${direct.body.length}개 노출` : `오류 ${direct.body?.code ?? direct.body?.message ?? '없음'}`) });
   }
+  return base;
+}
+
+// 6단계: 5단계 점검을 이어 쓰고, 판정기 device_registered 규칙을 로컬 가상 요청으로 확인합니다.
+// 미등록 기기로 실제 자료실에 들어오는 공격은 심판이 보내므로 여기서는 미실행으로 남깁니다.
+async function runStep6Checks(config) {
+  const base = (await runStep5Checks(config)).filter((item) => item.attackId !== 'deployment_identity_present');
+  const identity = await anonymousGet(appUrl(config), '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 6 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  try {
+    const { checkDecider } = await import('../scripts/decider-test.mjs');
+    const { decide, RULE_IDS } = await import('./decider.mjs');
+    const results = await checkDecider({ decide, ruleIds: RULE_IDS });
+    base.push({ attackId: 'decider_device_registered_local', expected: '로컬 가상 요청: 등록 기기 allow, 미등록 기기 deny·device_not_registered',
+      observed: `로컬 연습(심판 판정 아님) · ${results.map((r) => `${r.name} ${r.passed ? '통과' : '확인 필요'}`).join(' · ')}` });
+  } catch (error) {
+    base.push({ attackId: 'decider_device_registered_local', expected: '로컬 가상 요청: 등록 기기 allow, 미등록 기기 deny·device_not_registered',
+      observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
+  }
+  base.push({ attackId: 'unregistered_device_access', expected: '미등록 기기로 자료실 읽기 요청은 거부',
+    observed: '미실행: 미등록 기기 요청은 심판이 보내며 bundle에서 보내지 않음' });
   return base;
 }
