@@ -309,6 +309,7 @@
 - 심판은 `npm run bundle`을 격리 환경에서 실행하며, 그 환경에서는 `node:fs`·`node:path`·`node:url`·`node:child_process`(git 읽기)·`node:crypto`만 쓰고 공개 HTTPS 주소에 **GET·HEAD**만 보낼 수 있습니다.
 - 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 실제 결과는 작전실 실측표(`/ops.html`)와 로컬 시험으로 확인합니다.
 - 9단계 탐지 점검은 `node:util`을 쓰는 `scripts/detect-test.mjs`를 불러오지 않고 같은 6개 사례를 직접 만들어 확인합니다.
+- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 점검마다 GET 요청을 **한 번씩만** 보내고 그 요청에 `X-Aleph-Attack-Id: <attackId>` 헤더를 붙입니다. `observed`에는 실제로 보낸 메서드·전체 주소와 서버가 돌려준 상태·오류 코드만 적습니다. 요청을 보내지 않은 점검은 모두 `not_run`이고, 요청이 아닌 로컬 시험(탐지·판정기 연습)은 제출 묶음에서 뺐습니다.
 
 ### 출처: 제공 엔진·시작 틀과 학생 작업
 
