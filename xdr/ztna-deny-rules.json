@@ -276,6 +276,127 @@
       "confidence": 0.92,
       "createdAt": "2026-10-12T05:39:25.764Z",
       "expiresAt": "2026-10-12T06:39:25.764Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.203.0.113.10",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.10"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-01",
+        "kc-02"
+      ],
+      "patterns": [
+        "jndi-lookup-in-header",
+        "jndi-lookup-in-param"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.198.51.100.16",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.16"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-03"
+      ],
+      "patterns": [
+        "jndi-lookup-in-param"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.192.0.2.16",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.16"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-04"
+      ],
+      "patterns": [
+        "jndi-lookup-in-header"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.203.0.113.24",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.24"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-05"
+      ],
+      "patterns": [
+        "jndi-lookup-in-param"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.198.51.100.24",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.24"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-06"
+      ],
+      "patterns": [
+        "jndi-lookup-in-param"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.192.0.2.24",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.24"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-07"
+      ],
+      "patterns": [
+        "jndi-lookup-in-header"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.known-cve.deny.203.0.113.31",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.31"
+      },
+      "reasonCode": "xdr_known_cve",
+      "evidenceAlertIds": [
+        "kc-08"
+      ],
+      "patterns": [
+        "jndi-lookup-in-header,"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-13T07:25:21.940Z",
+      "expiresAt": "2026-10-13T08:25:21.940Z"
     }
   ]
 }

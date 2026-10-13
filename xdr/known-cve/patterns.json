@@ -1,0 +1,37 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "known-cve",
+  "source": "CVE-2021-44228 (https://nvd.nist.gov/vuln/detail/CVE-2021-44228) · MITRE ATT&CK T1190 Exploit Public-Facing Application (https://attack.mitre.org/techniques/T1190/)",
+  "patterns": [
+    {
+      "name": "jndi-lookup-in-header",
+      "technique": "T1190",
+      "condition": "요청 머리글(User-Agent 등)에 완전한 원격 조회 구문 ${jndi:<ldap|ldaps|rmi|dns|iiop|http>://...} 이 있음",
+      "evidence": "CVE-2021-44228: 공격자가 기록되는 머리글에 JNDI 조회 구문을 넣으면 Log4j 가 외부 주소에서 코드를 받아 실행할 수 있다."
+    },
+    {
+      "name": "jndi-lookup-in-param",
+      "technique": "T1190",
+      "condition": "요청 주소·인자에 완전한 원격 조회 구문 ${jndi:<프로토콜>://...} 이 있음",
+      "evidence": "CVE-2021-44228: 기록되는 요청 인자 역시 같은 조회 구문으로 원격 코드 실행을 일으키며, T1190 의 공개 앱 취약점 악용에 해당한다."
+    },
+    {
+      "name": "jndi-lookup-obfuscated",
+      "technique": "T1190",
+      "condition": "${lower:j}·${::-n} 같은 중첩 조회로 쪼갰지만 풀면 ${jndi:<프로토콜>:// 이 되는 구문",
+      "evidence": "CVE-2021-44228: Log4j 는 중첩된 조회를 먼저 풀어 처리하므로, 쪼갠 표기도 풀린 뒤 같은 원격 조회로 실행된다."
+    },
+    {
+      "name": "cve-scanner-trace",
+      "technique": "T1190",
+      "condition": "알려진 취약점 점검 도구 이름(nuclei·log4j-scan·zgrab·masscan 등)이 요청 머리글에 있음",
+      "evidence": "T1190: 공격자는 공개 앱을 악용하기 전에 공개 취약점 점검 도구로 대상을 훑으므로, 점검 도구 흔적은 악용 시도의 전 단계 신호다."
+    },
+    {
+      "name": "cve-reference-without-lookup",
+      "technique": "T1190",
+      "condition": "T1190 탐지 규칙이 걸렸거나 CVE 번호·jndi 단어·잘린 ${ 표기가 있지만 완전한 원격 조회 구문은 없음",
+      "evidence": "CVE-2021-44228 악용에는 완전한 ${jndi:<프로토콜>:// 구문이 필요하므로, 이름·단어·조각만 있는 요청은 검색·수업 노트와 구별되지 않아 확인이 필요하다."
+    }
+  ]
+}

@@ -31,7 +31,7 @@
 - **3단계 「진짜 로그인을 붙입니다」:** 커밋 `c41064f`(3단계 저장점). 로그인·토큰 검사·메모 CRUD API.
 - **4단계 「로그인해도 내 자료만 보이게 합니다」:** 커밋 `64bfad7`(4단계 저장점). 커밋 뒤 학습 DB에 `step4-owners.local.sql`(A 4건·B 1건)과 RLS·최소 권한 SQL을 실제로 실행했습니다.
 - **5단계 「자료 요청을 서버 한곳으로 모읍니다」:** 커밋 `9370122`(5단계 저장점). 원본 주소 직접 권한 회수.
-- **보너스 xdr-01·xdr-02:** 커밋 `8217d0b`(brute-force), `0007c87`(web-injection). `xdr/` 폴더만 바꿨습니다. 자세한 내용은 [xdr/README.md](xdr/README.md).
+- **보너스 xdr-01·xdr-02·xdr-03:** 커밋 `8217d0b`(brute-force), `0007c87`(web-injection), 「보너스 xdr-03 저장점」(known-cve, Log4Shell `${jndi:` 구문 탐지). `xdr/` 폴더만 바꿨습니다. 다시 실행: `npm run xdr:run -- known-cve`, 차단 연결: `node xdr/known-cve/respond.mjs`. 자세한 내용은 [xdr/README.md](xdr/README.md).
 - **6단계 「등록한 기기만 자료실에 들어옵니다」:** 커밋 `d6ca34b`(6단계 저장점). 판정기 `device_registered` 규칙.
 - **7단계 「평소와 다른 접속은 다시 확인합니다」:** 커밋 `0cf4ba9`(7단계 저장점). 입력 검사와 `step_up_required` 규칙.
 - **8단계 「자료마다 갈 수 있는 구역을 나눕니다」:** 커밋 `9f1bfd7`(8단계 저장점)과 판정기 수정 `d33a901`·`6646f68`·`535cd3e`. 마지막 `535cd3e`에서 판정기는 공지 읽기·메모 전체 목록을 거부하고, 메모 한 건 주인 비교는 API에 맡깁니다.
