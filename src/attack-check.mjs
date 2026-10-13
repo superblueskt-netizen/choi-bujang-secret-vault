@@ -315,10 +315,14 @@ async function runStep11Checks(config) {
 // 요청을 보내지 않은 점검(쓰기 요청이 필요하거나 로그인·기기 패스키가 필요한 것)은 observed를 not_run으로 둡니다.
 // 로컬 시험(가짜 DB·가상 요청)은 요청이 아니므로 이 묶음에 넣지 않고 README·작전실에서 따로 보여 줍니다.
 const FORGED_BEARER = 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged';
-async function sendGet(attackId, url, headers = {}) {
+// 심판이 요청 기록과 attackId를 짝짓는 이름이 문서에 없어, 흔한 이름 여러 곳에 같은 attackId를 붙입니다.
+// 우리 앱 주소에는 ?attackId= 도 붙입니다(서버는 이 값을 쓰지 않음). 외부 원본 주소에는 쿼리를 붙이지 않습니다.
+async function sendGet(attackId, url, headers = {}, { query = true } = {}) {
+  const target = new URL(url);
+  if (query) target.searchParams.set('attackId', attackId);
   try {
-    const response = await fetch(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
-      headers: { 'X-Aleph-Attack-Id': attackId, ...headers } });
+    const response = await fetch(target.href, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
+      headers: { 'X-Aleph-Attack-Id': attackId, 'X-Attack-Id': attackId, 'X-Aleph-Attack': attackId, ...headers } });
     const text = await response.text();
     let body = null;
     try { body = JSON.parse(text); } catch { /* JSON 아님 */ }
@@ -353,9 +357,11 @@ async function runStep12Checks(config) {
   }
   const results = [];
   for (const item of gets) {
-    const r = await sendGet(item.attackId, item.url, item.headers);
+    const sameApp = new URL(item.url).origin === app.origin;
+    const sent = sameApp ? `${item.url}${item.url.includes('?') ? '&' : '?'}attackId=${item.attackId}` : item.url;
+    const r = await sendGet(item.attackId, item.url, item.headers, { query: sameApp });
     const observed = !r ? 'not_run'
-      : `GET ${item.url} → HTTP ${r.status}`
+      : `GET ${sent} → HTTP ${r.status}`
         + (Array.isArray(r.body) ? ` · 배열 ${r.body.length}건` : r.body?.error || r.body?.code ? ` · ${r.body.error ?? r.body.code}` : '')
         + (item.show ? ` · ${item.show(r)}` : '');
     results.push({ attackId: item.attackId, expected: item.expected, observed: observed.slice(0, 300) });
