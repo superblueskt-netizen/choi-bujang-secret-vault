@@ -47,7 +47,10 @@ function appUrl(config) {
 }
 
 // 2단계: 실제로 보낸 비로그인 요청의 결과만 적습니다. 메모 본문은 기록하지 않습니다.
+// 12단계: 제출 묶음은 격리 환경에서 공개 HTTPS 주소에 GET·HEAD만 보냅니다. 쓰기 요청이 필요한 점검은 보내지 않고 not_run으로 둡니다.
 async function anonymousGet(app, path, init = {}) {
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') return { status: 0, body: null, notRun: true };
   try {
     const response = await fetch(new URL(path, app), { redirect: 'error', signal: AbortSignal.timeout(10000), ...init });
     let body = null;
@@ -58,8 +61,7 @@ async function anonymousGet(app, path, init = {}) {
   }
 }
 
-const unreached = result => result.status === 0
-  ? `요청 실패(${result.failed ?? '네트워크'}) · 미실행과 같음, 판정 근거로 쓰지 않음` : null;
+const unreached = result => (result.status === 0 ? 'not_run' : null);
 
 async function runStep2Checks(config) {
   const app = appUrl(config);
@@ -124,7 +126,7 @@ async function runStep4Checks(config) {
         + (Array.isArray(direct.body) ? `행 ${direct.body.length}개 노출` : `오류 ${direct.body?.code ?? direct.body?.message ?? '없음'}`) });
   }
   checks.push({ attackId: 'cross_owner_note_access', expected: 'B 토큰으로 A 메모 GET·PUT·DELETE는 거부',
-    observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/owner.test.mjs 로컬 시험(가짜 DB)에서만 404 확인' });
+    observed: 'not_run' });
   return checks;
 }
 
@@ -139,7 +141,7 @@ async function runStep5Checks(config) {
   const publicKey = config.publicDataApiKey ?? process.env.ALEPH_PUBLIC_DATA_API_KEY;
   if (typeof config.originalApiUrl === 'string' && typeof publicKey !== 'string') {
     base.push({ attackId: 'original_api_direct_read', expected: '공개 키로 원본 자료 주소를 직접 부르면 메모 없음(권한 오류)',
-      observed: '미실행: 공개 키 값을 Git·설정에 두지 않아 이번 묶음에서는 보내지 않음(환경변수 ALEPH_PUBLIC_DATA_API_KEY를 넣으면 실행)' });
+      observed: 'not_run' });
   }
   if (typeof config.originalApiUrl === 'string' && typeof publicKey === 'string') {
     const direct = await anonymousGet(new URL(config.originalApiUrl), '', { headers: { apikey: publicKey } });
@@ -168,7 +170,7 @@ async function runStep6Checks(config) {
       observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
   }
   base.push({ attackId: 'unregistered_device_access', expected: '미등록 기기로 자료실 읽기 요청은 거부',
-    observed: '미실행: 미등록 기기 요청은 심판이 보내며 bundle에서 보내지 않음' });
+    observed: 'not_run' });
   return base;
 }
 
@@ -190,7 +192,7 @@ async function runStep7Checks(config) {
       observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
   }
   base.push({ attackId: 'step_up_before_reauth_block', expected: '복합 이상 접속은 새 로그인 전 자료 없음, 새 로그인 뒤 요청은 허용',
-    observed: '미실행: 제공 엔진이 새 로그인 시각을 검증하는 환경이 필요해 bundle에서 보내지 않음. 로컬 가상 사건 시험만 실행' });
+    observed: 'not_run' });
   return base;
 }
 
@@ -227,7 +229,7 @@ async function runStep8Checks(config) {
       observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
   }
   base.push({ attackId: 'student_notice_update', expected: '학생 토큰으로 공지 수정은 403 INSTRUCTOR_ONLY',
-    observed: '미실행: 학생 로그인 토큰이 필요해 bundle에서 보내지 않음. test/zone.test.mjs 로컬 시험(가짜 DB)에서만 403 확인' });
+    observed: 'not_run' });
   return base;
 }
 
@@ -239,9 +241,21 @@ async function runStep9Checks(config) {
   base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 9 배포 식별 정보가 있음',
     observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
   try {
-    const { checkDetection } = await import('../scripts/detect-test.mjs');
+    // 격리 환경에서 쓸 수 없는 node:util을 피하려고 scripts/detect-test.mjs와 같은 6개 사례를 여기서 직접 만듭니다.
     const { detect } = await import('./detect.mjs');
-    const results = await checkDetection(detect);
+    const START = Date.UTC(2026, 9, 1);
+    const reads = (n, { gap = 2, sub = 'learner_fixture' } = {}) => Array.from({ length: n }, (_, i) => ({
+      at: new Date(START + i * gap * 1000).toISOString(), method: 'GET', identity: { sub } }));
+    const hit = { action: 'propose_revocation', reasonCode: 'burst_read', subject: 'learner_fixture' };
+    const cases = [
+      { name: '정상 조회 30건', events: reads(30), expected: { action: 'observe' } },
+      { name: '10분 안에 120건', events: reads(120), expected: { action: 'observe' } },
+      { name: '10분 안에 121건', events: reads(121), expected: hit },
+      { name: '폭주 조회 200건', events: reads(200), expected: hit },
+      { name: '서로 다른 사용자 각 100건', events: [...reads(100), ...reads(100, { sub: 'other_fixture' })], expected: { action: 'observe' } },
+      { name: '10분 밖으로 흩어진 조회 200건', events: reads(200, { gap: 7 }), expected: { action: 'observe' } },
+    ];
+    const results = cases.map((c) => ({ name: c.name, passed: JSON.stringify(detect(c.events)) === JSON.stringify(c.expected) }));
     base.push({ attackId: 'detect_burst_read_local', expected: '로컬 가상 사건: 10분 안 120건 초과만 propose_revocation, 정상은 observe',
       observed: `로컬 연습(심판 판정 아님) · ${results.filter((r) => r.passed).length}/${results.length} 통과`
         + (results.every((r) => r.passed) ? '' : ` · 확인 필요: ${results.filter((r) => !r.passed).map((r) => r.name).join(', ')}`) });
@@ -250,7 +264,7 @@ async function runStep9Checks(config) {
       observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
   }
   base.push({ attackId: 'revocation_enforced', expected: '회수 제안 뒤 해당 접속이 회수되고 정상 기기는 유지',
-    observed: '미실행: 회수 집행과 경과 시간은 심판·운영 엔진이 확인하며 bundle에서 보내지 않음' });
+    observed: 'not_run' });
   return base;
 }
 
@@ -269,7 +283,7 @@ async function runStep10Checks(config) {
   base.push({ attackId: 'anonymous_restore', expected: '로그인 없는 복원 요청은 401', observed: show('비로그인 POST /api/restore/:id', anon) });
   base.push({ attackId: 'forged_token_restore', expected: '가짜 토큰 복원 요청은 401', observed: show('가짜 토큰 POST /api/restore/:id', forged) });
   base.push({ attackId: 'restore_one_note_b', expected: 'B 메모 한 건 복원 뒤 id·소유자·내용 해시가 사본과 같음',
-    observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/restore.test.mjs 로컬 시험(가짜 DB)에서만 확인' });
+    observed: 'not_run' });
   return base.slice(-20);
 }
 
@@ -292,7 +306,7 @@ async function runStep11Checks(config) {
   base.push({ attackId: 'forged_device_cookie', expected: '가짜 기기 쿠키+가짜 토큰으로 자료 요청은 거부(401/403)',
     observed: unreached(fakeCookie) ?? `가짜 쿠키 GET /api/notes HTTP ${fakeCookie.status} · 오류 ${fakeCookie.body?.error ?? 'JSON 아님'}` });
   base.push({ attackId: 'approved_device_opens_vault', expected: '승인 전 자료 없음(403), 서버 승인·패스키 확인 뒤 기존 화면 정상',
-    observed: '미실행: 로그인과 기기 패스키가 필요해 bundle에서 보내지 않음. test/device.test.mjs 로컬 시험(가상 패스키·가짜 DB)에서만 확인' });
+    observed: 'not_run' });
   return base.slice(-20);
 }
 
@@ -312,9 +326,9 @@ async function runStep12Checks(config) {
     const res = await fetch(new URL('/ops.html', app), { redirect: 'error', signal: AbortSignal.timeout(10000) });
     const html = await res.text();
     page = `GET /ops.html HTTP ${res.status} · 키 값 ${/sb_publishable_|sb_secret_/u.test(html) ? '있음' : '없음'}`;
-  } catch (error) { page = `요청 실패(${error.name}) · 미실행과 같음, 판정 근거로 쓰지 않음`; }
+  } catch { page = 'not_run'; }
   base.push({ attackId: 'ops_page_present', expected: '작전실 화면이 있고 키 값이 없음', observed: page });
   base.push({ attackId: 'ops_live_matrix', expected: '로그인한 브라우저에서 1~11단계 정상·금지 요청을 실측해 요청 ID·시각과 함께 기록',
-    observed: '미실행: 로그인 쿠키가 필요해 bundle에서 보내지 않음. /ops.html 「지금 실측」에서만 만들고 결과 JSON을 내려받음' });
+    observed: 'not_run' });
   return base.slice(-20);
 }

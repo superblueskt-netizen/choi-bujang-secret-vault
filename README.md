@@ -304,6 +304,12 @@
   - 이 표는 학생 실측입니다. 41종 공격 방어 판정은 심판이 하며, 화면의 문구나 「일치」를 통과 근거로 쓰지 않습니다.
 - 확인: `node --test test/ops.test.mjs`(3개: 요약이 서버 값만 쓰고 본문·전체 ID 없음, 비로그인 401, 화면이 미실행을 통과로 바꾸지 않음).
 
+### 제출 묶음 자기 점검의 제한 (심판 `S12_BUNDLE_UNSUPPORTED` 뒤 수정)
+
+- 심판은 `npm run bundle`을 격리 환경에서 실행하며, 그 환경에서는 `node:fs`·`node:path`·`node:url`·`node:child_process`(git 읽기)·`node:crypto`만 쓰고 공개 HTTPS 주소에 **GET·HEAD**만 보낼 수 있습니다.
+- 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 실제 결과는 작전실 실측표(`/ops.html`)와 로컬 시험으로 확인합니다.
+- 9단계 탐지 점검은 `node:util`을 쓰는 `scripts/detect-test.mjs`를 불러오지 않고 같은 6개 사례를 직접 만들어 확인합니다.
+
 ### 출처: 제공 엔진·시작 틀과 학생 작업
 
 - **제공(ALEPH SDP 엔진·시작 틀, 이 저장소의 첫 커밋 `f2aa3b5`에서 받은 파일):** 판정 요청·응답 계약(`docs/DECIDER_REQUEST.md`, `aleph.decision.v1`), 탐지 사건 계약(`docs/DETECT_EVENTS.md`), 로그인 검사기 `src/verify-login.mjs`, 제출 묶음 `scripts/bundle.mjs`, 배포 식별 `scripts/deployment-identity.mjs`·`scripts/build-public.mjs`, 연습 도구 `scripts/decider-test.mjs`·`scripts/detect-test.mjs`·`scripts/fixture-7.mjs`·`scripts/xdr-run.mjs`, `xdr/fixtures/`, `api/ai.js`·`api/threat-intel.js`, `package/` 문서, 시험 `test/r5.test.mjs`·`test/package-starter.test.mjs`·`test/xdr-run.test.mjs`. 실제 판정 요청을 만들어 판정기를 부르고, 기기·신원·경로를 먼저 확인하고, 회수 제안을 집행하는 것은 **ALEPH SDP 엔진(반 엔진·심판)**이 하며 이 저장소에 들어 있지 않습니다.
