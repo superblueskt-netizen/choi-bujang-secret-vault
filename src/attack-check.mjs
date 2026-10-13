@@ -8,6 +8,7 @@ export async function runAttackChecks(config) {
   if (config.step === 6) return runStep6Checks(config);
   if (config.step === 7) return runStep7Checks(config);
   if (config.step === 8) return runStep8Checks(config);
+  if (config.step === 9) return runStep9Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -218,5 +219,28 @@ async function runStep8Checks(config) {
   }
   base.push({ attackId: 'student_notice_update', expected: '학생 토큰으로 공지 수정은 403 INSTRUCTOR_ONLY',
     observed: '미실행: 학생 로그인 토큰이 필요해 bundle에서 보내지 않음. test/zone.test.mjs 로컬 시험(가짜 DB)에서만 403 확인' });
+  return base;
+}
+
+// 9단계: 8단계 점검을 이어 쓰고, 탐지 규칙 burst_read를 로컬 가상 사건으로 확인합니다.
+// 실제 회수 집행과 첫 의심 요청부터 회수까지의 시간은 심판이 가상 사건을 보내 확인하므로 미실행으로 남깁니다.
+async function runStep9Checks(config) {
+  const base = (await runStep8Checks(config)).filter((item) => !['deployment_identity_present', 'decider_rules_local'].includes(item.attackId));
+  const identity = await anonymousGet(appUrl(config), '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 9 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  try {
+    const { checkDetection } = await import('../scripts/detect-test.mjs');
+    const { detect } = await import('./detect.mjs');
+    const results = await checkDetection(detect);
+    base.push({ attackId: 'detect_burst_read_local', expected: '로컬 가상 사건: 10분 안 120건 초과만 propose_revocation, 정상은 observe',
+      observed: `로컬 연습(심판 판정 아님) · ${results.filter((r) => r.passed).length}/${results.length} 통과`
+        + (results.every((r) => r.passed) ? '' : ` · 확인 필요: ${results.filter((r) => !r.passed).map((r) => r.name).join(', ')}`) });
+  } catch (error) {
+    base.push({ attackId: 'detect_burst_read_local', expected: '로컬 가상 사건: 10분 안 120건 초과만 propose_revocation, 정상은 observe',
+      observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
+  }
+  base.push({ attackId: 'revocation_enforced', expected: '회수 제안 뒤 해당 접속이 회수되고 정상 기기는 유지',
+    observed: '미실행: 회수 집행과 경과 시간은 심판·운영 엔진이 확인하며 bundle에서 보내지 않음' });
   return base;
 }
