@@ -1,5 +1,5 @@
 {
-  "step": 10,
+  "step": 11,
   "repoUrl": "https://github.com/superblueskt-netizen/choi-bujang-secret-vault",
   "publicAppUrl": "https://choi-bujang-secret-vault-five-eta.vercel.app/",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -18,7 +18,12 @@
     "GET /api/notices",
     "GET /api/notices/:id",
     "PUT /api/notices/:id",
-    "POST /api/restore/:id"
+    "POST /api/restore/:id",
+    "GET /api/device/status",
+    "POST /api/device/challenge",
+    "POST /api/device/register",
+    "POST /api/device/verify",
+    "POST /api/device/signout"
   ],
   "originalApiUrl": "https://giixryoqzyamfedhnnpt.supabase.co/rest/v1/vault_notes",
   "restoreRoute": "POST /api/restore/:id",

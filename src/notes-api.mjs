@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
+import { readDeviceSession } from './device-session.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
@@ -24,6 +25,9 @@ function getServices() {
     services = {
       verify: createLoginVerifier({ config, supabaseSecretKey: key }),
       db: createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+      // 11단계: 운영에서는 승인된 기기 세션이 있어야 자료 API가 열립니다.
+      deviceSecret: key,
+      requireDevice: true,
     };
   }
   return services;
@@ -79,6 +83,38 @@ async function authenticate(request, response) {
   let svc;
   try { svc = getServices(); } catch {
     console.error('notes: 서버 환경변수가 설정되지 않았습니다.');
+    send(response, 500, { error: 'SERVER_NOT_CONFIGURED' });
+    return null;
+  }
+  const user = await svc.verify(request.headers?.authorization);
+  if (!user?.userId) {
+    send(response, 401, { error: 'LOGIN_REQUIRED', message: '로그인 토큰이 없거나 확인되지 않았습니다.' });
+    return null;
+  }
+  // 11단계 기기 확인: 로그인과 별도로, 서버가 발급한 기기 세션 쿠키가 같은 사용자의 '승인된' 기기를 가리켜야 합니다.
+  // 화면의 버튼·앱 설치 여부·요청 본문 값은 보지 않고, DB의 승인 상태를 요청마다 다시 확인합니다(승인 취소 즉시 반영).
+  if (svc.requireDevice) {
+    const session = readDeviceSession(request.headers?.cookie, svc.deviceSecret);
+    let approved = false;
+    if (session && session.userId === user.userId) {
+      const { data, error } = await svc.db.from('vault_devices').select('id')
+        .eq('id', session.deviceId).eq('user_id', user.userId).eq('status', 'approved').maybeSingle();
+      if (error) { dbFailure(response, '기기 확인', error); return null; }
+      approved = Boolean(data);
+    }
+    if (!approved) {
+      send(response, 403, { error: 'DEVICE_NOT_APPROVED', message: '승인된 기기에서 기기 확인을 마친 뒤에만 자료를 볼 수 있습니다.' });
+      return null;
+    }
+  }
+  return { ...svc, userId: user.userId };
+}
+
+// 11단계 기기 API가 같은 로그인 검사·DB를 쓰도록 내보냅니다(기기 확인 자체는 요구하지 않음).
+export async function authenticateLoginOnly(request, response) {
+  response.setHeader('Cache-Control', 'no-store');
+  let svc;
+  try { svc = getServices(); } catch {
     send(response, 500, { error: 'SERVER_NOT_CONFIGURED' });
     return null;
   }

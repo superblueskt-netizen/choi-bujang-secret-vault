@@ -10,6 +10,7 @@ export async function runAttackChecks(config) {
   if (config.step === 8) return runStep8Checks(config);
   if (config.step === 9) return runStep9Checks(config);
   if (config.step === 10) return runStep10Checks(config);
+  if (config.step === 11) return runStep11Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -262,5 +263,28 @@ async function runStep10Checks(config) {
   base.push({ attackId: 'forged_token_restore', expected: '가짜 토큰 복원 요청은 401', observed: show('가짜 토큰 POST /api/restore/:id', forged) });
   base.push({ attackId: 'restore_one_note_b', expected: 'B 메모 한 건 복원 뒤 id·소유자·내용 해시가 사본과 같음',
     observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/restore.test.mjs 로컬 시험(가짜 DB)에서만 확인' });
+  return base.slice(-20);
+}
+
+// 11단계: 10단계 점검을 이어 쓰고, 접속 앱 설정(manifest)과 기기 승인 API를 로그인 없이 불러 봅니다.
+// 승인된 기기에서 기존 화면이 열리는지는 패스키와 로그인이 필요해 bundle에서 하지 않습니다(미실행).
+async function runStep11Checks(config) {
+  const base = (await runStep10Checks(config)).filter((item) => !['deployment_identity_present', 'restore_one_note_b',
+    'revocation_enforced', 'step_up_before_reauth_block', 'unregistered_device_access'].includes(item.attackId));
+  const app = appUrl(config);
+  const identity = await anonymousGet(app, '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 11 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  const manifest = await anonymousGet(app, '/manifest.webmanifest');
+  base.push({ attackId: 'app_manifest_present', expected: '접속 앱 manifest가 있고 설치만으로 기기 확인이라고 하지 않음',
+    observed: unreached(manifest) ?? `GET /manifest.webmanifest HTTP ${manifest.status} · 이름 ${manifest.body?.short_name ?? '없음'} · display ${manifest.body?.display ?? '없음'}` });
+  const status = await anonymousGet(app, '/api/device/status');
+  base.push({ attackId: 'anonymous_device_status', expected: '로그인 없는 기기 상태 요청은 401', observed: unreached(status) ?? `비로그인 GET /api/device/status HTTP ${status.status} · 오류 ${status.body?.error ?? 'JSON 아님'}` });
+  const fakeCookie = await anonymousGet(app, '/api/notes', { headers: { cookie: '__Host-vault_device=eyJ1IjoieCJ9.forged',
+    Authorization: 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged' } });
+  base.push({ attackId: 'forged_device_cookie', expected: '가짜 기기 쿠키+가짜 토큰으로 자료 요청은 거부(401/403)',
+    observed: unreached(fakeCookie) ?? `가짜 쿠키 GET /api/notes HTTP ${fakeCookie.status} · 오류 ${fakeCookie.body?.error ?? 'JSON 아님'}` });
+  base.push({ attackId: 'approved_device_opens_vault', expected: '승인 전 자료 없음(403), 서버 승인·패스키 확인 뒤 기존 화면 정상',
+    observed: '미실행: 로그인과 기기 패스키가 필요해 bundle에서 보내지 않음. test/device.test.mjs 로컬 시험(가상 패스키·가짜 DB)에서만 확인' });
   return base.slice(-20);
 }
