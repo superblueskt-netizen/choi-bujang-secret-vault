@@ -33,7 +33,8 @@
 - **5단계 「자료 요청을 서버 한곳으로 모읍니다」:** 커밋 `9370122`(5단계 저장점). 원본 주소 직접 권한 회수.
 - **보너스 xdr-01·xdr-02:** 커밋 `8217d0b`(brute-force), `0007c87`(web-injection). `xdr/` 폴더만 바꿨습니다. 자세한 내용은 [xdr/README.md](xdr/README.md).
 - **6단계 「등록한 기기만 자료실에 들어옵니다」:** 커밋 `d6ca34b`(6단계 저장점). 판정기 `device_registered` 규칙.
-- **7단계 「평소와 다른 접속은 다시 확인합니다」:** 「7단계 저장점」 커밋. 아래 「7단계」 절이 현재 상태입니다.
+- **7단계 「평소와 다른 접속은 다시 확인합니다」:** 커밋 `0cf4ba9`(7단계 저장점). 입력 검사와 `step_up_required` 규칙.
+- **8단계 「자료마다 갈 수 있는 구역을 나눕니다」:** 「8단계 저장점」 커밋. 아래 「8단계」 절이 현재 상태입니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -148,12 +149,12 @@
 
 이 시험은 가상 요청으로 하는 로컬 연습이며 심판 판정이 아닙니다. 미등록 기기로 들어오는 실제 공격 요청은 심판이 보냅니다. `npm run bundle`의 자기 점검에도 이 공격은 **미실행**으로 기록합니다.
 
-## 7단계: 현재 작동하는 기능
+## 7단계에서 만든 것 (8단계에도 유지)
 
 - **입력 검사** (`src/decider.mjs`의 `readSignals`·`readRecentEvents`·`readStepUp`): 판정기는 엔진이 넘긴 판정 요청의 최상위 값만 읽고, 브라우저 헤더나 위치는 읽지 않습니다. `signals.source`가 `judge_fixture`(심판의 가상 사건)일 때만 지역·네트워크·시각을 씁니다. `none`(실제 경로, 정보 없음)이나 목록에 없는 출처(예: `client_header`)는 모두 `unknown`/`null`로 두고, 빠진 값도 정상값으로 채우지 않습니다.
 - **규칙 `step_up_required`:** 평소와 다른 시각(0~5시) + 처음 보는 네트워크(`unusual`) + 최근 600초 안 대량 읽기 사건(`risk_signal`·`bulk_read` 합계 10건 이상)이 **모두** 겹치면 `step_up`과 이유 코드 `step_up_required`를 돌려줍니다. 지역은 조건에 넣지 않았고, 이 규칙은 `deny`(영구 차단)를 하지 않습니다.
 - **다시 확인:** 엔진이 검증한 `stepUp.verified === true`이고 `authAgeSeconds`가 0~900초일 때만 복합 이상 요청을 허용합니다. 그 밖(`'true'` 문자열, 나이 없음, 900초 초과)은 계속 `step_up`입니다.
-- **기기 규칙 유지:** `device_registered`가 먼저 돌고, 미등록 기기는 `deny`·`device_not_registered`입니다. `RULE_IDS` = `['device_registered', 'step_up_required']`.
+- **기기 규칙 유지:** `device_registered`가 먼저 돌고, 미등록 기기는 `deny`·`device_not_registered`입니다. 7단계 당시 `RULE_IDS` = `['device_registered', 'step_up_required']`.
 - 판정 요청 계약에는 `stepUp`(엔진이 확인한 새 로그인 시각)이 있습니다. 다만 재로그인 전 실제 자료 차단과 새 로그인 뒤 허용은 제공 엔진이 그 시각을 검증하는 환경에서만 잴 수 있어, `npm run bundle`의 자기 점검에는 **미실행**으로 남깁니다. 토큰 원문은 어디에도 기록하지 않습니다.
 
 ### 확인 순서
@@ -163,3 +164,33 @@
 3. `node --test test/step7.test.mjs` → 위조 출처가 신뢰 값으로 승격되지 않음, 빠진 값을 정상값으로 채우지 않음, 지역만 다르면 허용, 만료된 재로그인은 다시 `step_up`, 기기 규칙 유지. 6개 모두 통과여야 합니다.
 
 이 시험들은 가상 요청으로 하는 로컬 연습이며 심판 판정이 아닙니다.
+
+## 8단계: 현재 작동하는 기능
+
+- **자원 ID:** 메모는 `note:<id>`, 강사 공지는 `notice:<id>`, 목록은 `notes:mine`·`notices:all`입니다. 서버 함수가 응답 헤더 `X-Aleph-Resource`에 붙입니다. 응답 본문 모양(`{id,title,body}`)과 기존 메모 주소는 그대로입니다. 메모와 공지는 다른 테이블(`vault_notes`·`vault_notices`)이라 id가 섞이지 않습니다.
+- **공지 API** (`api/notices.js`, `api/notices/[id].js`, `src/notes-api.mjs`):
+
+| 경로 | 동작 |
+|---|---|
+| `GET /api/notices` | 로그인 사용자에게 공지 목록 |
+| `GET /api/notices/:id` | 로그인 사용자에게 공지 한 건, 없으면 `404` |
+| `PUT /api/notices/:id` | **DB의 강사 목록(`vault_instructors`)에 있는 사용자만** 수정. 아니면 `403 {"error":"INSTRUCTOR_ONLY"}` |
+
+- **API 권한 재확인:** 메모는 4단계처럼 저장된 `owner_id`와 검증된 사용자 ID를 비교합니다(남의 메모는 `404`). 공지 수정은 검증된 사용자 ID를 강사 목록과 대조합니다. 화면 메뉴와 요청 본문의 `role`·`isInstructor`는 읽지 않습니다. 거부하면 서버 로그에 `zone deny: owner_mismatch note:<id>`처럼 짧은 사유와 자원 ID만 남기고, 사용자 ID·토큰·본문은 남기지 않습니다.
+- **판정기 구역 규칙** (`src/decider.mjs`): 엔진이 확인한 `subjectId`·`deviceId`·`method`·`route`·`path`를 씁니다. 구역 표에 있는 경로 모양(`route`)과 메서드가 일치하고, 실제 `path`가 그 모양과 정확히 맞으며, 쿼리가 없을 때만 구역을 받습니다.
+  - `zone_own_notes`: `GET·POST /notes`, `GET·PUT·DELETE /notes/:id` → 허용(소유자 대조는 자료 API가 함)
+  - `zone_notices_read`: `GET /notices`, `GET /notices/:id` → 허용
+  - `zone_notice_write`: `PUT /notices/:id` → `deny`·`instructor_role_unverified`. 현재 판정 요청 계약에는 엔진이 확인한 역할이 없어서, 추측하지 않고 거부합니다.
+  - `zone_route_allowlist`: 표에 없는 경로(예: `/notes/:id/export`, `/export`), 메서드 불일치, 쿼리 있음, 형식이 틀린 기기 ID → `deny`·`route_not_allowed`
+  - 자료는 경로의 `:id` 한 칸으로만 고르고, 쿼리로 기능을 고르지 않습니다. `:id`와 같은 깊이에 기능 경로를 두지 않았습니다.
+  - 순서: `device_registered` → 구역 → `step_up_required` → 허용. `RULE_IDS` = `['device_registered', 'step_up_required', 'zone_route_allowlist', 'zone_own_notes', 'zone_notices_read', 'zone_notice_write']`.
+- **판정기의 한계:** 판정 요청에는 메모 소유자가 없습니다. 그래서 "B가 A 메모를 연다"는 판정기에서 구별할 수 없고, 자료 API가 `404`로 막습니다. 새 이유 코드 `route_not_allowed`·`instructor_role_unverified`가 운영 등록부의 `allowedReasonCodes`에 있는지는 확인하지 못했습니다.
+- **DB SQL (제안, 학생이 검토 후 실행):** `supabase/step8-zones.sql`이 `vault_notices`·`vault_instructors`를 만들고 RLS를 켜고, `anon`·`authenticated` 권한을 회수합니다. 가상 공지 한 건을 넣습니다. 강사 계정은 파일 아래 주석의 이메일만 바꿔서 직접 넣습니다. 이 SQL을 실행하기 전에는 공지 API가 `502`를 돌려줍니다.
+
+### 확인 순서
+
+1. `node --test test/zone.test.mjs` → 8개 통과. 판정기: 자기 메모 allow, 공지 수정 deny, 기능·알 수 없는 경로 deny, 이전 규칙 유지. API: 자원 ID 구분, A 자기 메모 200, B의 A 메모 404, 학생 공지 수정(본문 role 포함) 403, 강사 공지 수정 200, 공지 id를 메모 주소로 보내면 404.
+2. `npm run decider:test`, `npm run fixture:7`, `node --test test/step7.test.mjs`가 그대로 통과해야 합니다.
+3. SQL을 실행하고 배포한 뒤, 시크릿 창에서 `/api/notices`를 열면 `401`이어야 합니다. A로 로그인한 화면의 콘솔에서 `fetch('/api/notices/<공지 id>', {method:'PUT', headers:{Authorization:'Bearer <A 토큰>','Content-Type':'application/json'}, body: JSON.stringify({title:'x', role:'instructor'})})`를 보내면 `403 INSTRUCTOR_ONLY`여야 합니다.
+
+이 시험들은 가상 요청과 가짜 DB로 하는 로컬 연습이며 심판 판정이 아닙니다.

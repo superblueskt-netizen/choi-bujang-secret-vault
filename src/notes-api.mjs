@@ -1,6 +1,7 @@
 // 메모 API 공통 처리. 서버가 src/verify-login.mjs로 확인한 사용자 ID만 믿습니다.
 // 4단계: 읽기·추가·수정·삭제 모두 확인된 사용자 ID와 DB의 owner_id를 비교하고, 맞지 않으면 기본 거부합니다.
 // URL·본문의 owner_id·userId·role은 소유자 판단에 쓰지 않습니다.
+// 8단계: 자원마다 구역 ID(note:<id>, notice:<id>)를 붙이고, 공지 수정은 DB의 강사 목록(vault_instructors)으로만 허용합니다.
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
@@ -9,6 +10,8 @@ import { createLoginVerifier } from './verify-login.mjs';
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const TABLE = 'vault_notes';
+const NOTICE_TABLE = 'vault_notices';
+const INSTRUCTOR_TABLE = 'vault_instructors';
 const COLUMNS = 'id, title, body';
 const OWNER_FIELDS = ['owner_id', 'ownerId', 'userId', 'user_id'];
 
@@ -28,6 +31,12 @@ function getServices() {
 
 const send = (response, status, body) => response.status(status).json(body);
 const notFound = (response) => send(response, 404, { error: 'NOT_FOUND' });
+
+// 8단계 자원 ID: 서버가 요청마다 구역을 구별하도록 응답 헤더에 붙입니다(응답 본문 모양은 그대로).
+export const resourceId = (kind, id) => `${kind}:${id}`;
+const markResource = (response, kind, id) => response.setHeader('X-Aleph-Resource', resourceId(kind, id));
+// 거부 사유는 짧은 코드와 자원 ID만 남깁니다. 사용자 ID·토큰·본문은 남기지 않습니다.
+const logDeny = (reason, resource) => console.warn(`zone deny: ${reason} ${resource}`);
 const publicNote = (row) => ({ id: row.id, title: row.title, body: row.body });
 
 // 본문에 다른 사람을 소유자로 적으면 거부합니다(자기 ID와 같으면 무시).
@@ -87,6 +96,7 @@ export async function handleCollection(request, response) {
     response.setHeader('Allow', 'GET, POST');
     return send(response, 405, { error: 'METHOD_NOT_ALLOWED' });
   }
+  markResource(response, 'notes', 'mine');
   const ctx = await authenticate(request, response);
   if (!ctx) return;
   if (request.method === 'GET') {
@@ -122,12 +132,14 @@ export async function handleItem(request, response, rawId) {
   if (!ctx) return;
   const id = typeof rawId === 'string' && UUID.test(rawId) ? rawId.toLowerCase() : null;
   if (!id) return notFound(response);
+  markResource(response, 'note', id);
 
   // 기존 행을 먼저 읽어 소유자를 서버에서 비교합니다.
   const { data: row, error: readError } = await ctx.db.from(TABLE)
     .select('id, title, body, owner_id').eq('id', id).maybeSingle();
   if (readError) return dbFailure(response, '읽기', readError);
-  if (!row || row.owner_id !== ctx.userId) return notFound(response);
+  if (!row) return notFound(response);
+  if (row.owner_id !== ctx.userId) { logDeny('owner_mismatch', resourceId('note', id)); return notFound(response); }
 
   if (request.method === 'GET') return send(response, 200, publicNote(row));
 
@@ -150,4 +162,59 @@ export async function handleItem(request, response, rawId) {
     .eq('id', id).eq('owner_id', ctx.userId).select('id').maybeSingle();
   if (error) return dbFailure(response, '삭제', error);
   return data ? send(response, 200, { id: data.id, deleted: true }) : notFound(response);
+}
+
+// ===== 8단계: 강사 공지 구역 =====
+// /api/notices       GET 공지 목록(로그인 사용자)
+// /api/notices/:id   GET 공지 한 건(로그인 사용자), PUT 공지 수정(DB 강사 목록에 있는 사용자만)
+// 화면 메뉴, 요청 본문의 role·isInstructor 같은 값은 권한 판단에 쓰지 않습니다.
+async function isInstructor(ctx) {
+  const { data, error } = await ctx.db.from(INSTRUCTOR_TABLE).select('user_id').eq('user_id', ctx.userId).maybeSingle();
+  if (error) return { error };
+  return { ok: data?.user_id === ctx.userId };
+}
+
+export async function handleNoticeCollection(request, response) {
+  if (request.method !== 'GET') {
+    response.setHeader('Allow', 'GET');
+    return send(response, 405, { error: 'METHOD_NOT_ALLOWED' });
+  }
+  markResource(response, 'notices', 'all');
+  const ctx = await authenticate(request, response);
+  if (!ctx) return;
+  const { data, error } = await ctx.db.from(NOTICE_TABLE).select(COLUMNS).order('created_at', { ascending: true });
+  if (error) return dbFailure(response, '공지 목록', error);
+  return send(response, 200, data);
+}
+
+export async function handleNoticeItem(request, response, rawId) {
+  if (!['GET', 'PUT'].includes(request.method)) {
+    response.setHeader('Allow', 'GET, PUT');
+    return send(response, 405, { error: 'METHOD_NOT_ALLOWED' });
+  }
+  const ctx = await authenticate(request, response);
+  if (!ctx) return;
+  const id = typeof rawId === 'string' && UUID.test(rawId) ? rawId.toLowerCase() : null;
+  if (!id) return notFound(response);
+  markResource(response, 'notice', id);
+
+  if (request.method === 'PUT') {
+    // 수정 전에 DB의 강사 목록으로 권한부터 확인합니다. 본문의 role은 읽지 않습니다.
+    const role = await isInstructor(ctx);
+    if (role.error) return dbFailure(response, '강사 확인', role.error);
+    if (!role.ok) {
+      logDeny('instructor_only', resourceId('notice', id));
+      return send(response, 403, { error: 'INSTRUCTOR_ONLY', message: '공지는 강사만 고칠 수 있습니다.' });
+    }
+    const input = readBody(request);
+    const notice = input && cleanNote(input, { partial: true });
+    if (!notice) return send(response, 400, { error: 'INVALID_NOTICE', message: 'title 또는 body를 확인하세요.' });
+    const { data, error } = await ctx.db.from(NOTICE_TABLE).update(notice).eq('id', id).select(COLUMNS).maybeSingle();
+    if (error) return dbFailure(response, '공지 수정', error);
+    return data ? send(response, 200, publicNote(data)) : notFound(response);
+  }
+
+  const { data, error } = await ctx.db.from(NOTICE_TABLE).select(COLUMNS).eq('id', id).maybeSingle();
+  if (error) return dbFailure(response, '공지 읽기', error);
+  return data ? send(response, 200, publicNote(data)) : notFound(response);
 }

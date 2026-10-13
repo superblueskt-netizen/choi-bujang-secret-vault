@@ -7,6 +7,7 @@ export async function runAttackChecks(config) {
   if (config.step === 5) return runStep5Checks(config);
   if (config.step === 6) return runStep6Checks(config);
   if (config.step === 7) return runStep7Checks(config);
+  if (config.step === 8) return runStep8Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -180,5 +181,41 @@ async function runStep7Checks(config) {
   }
   base.push({ attackId: 'step_up_before_reauth_block', expected: '복합 이상 접속은 새 로그인 전 자료 없음, 새 로그인 뒤 요청은 허용',
     observed: '미실행: 제공 엔진이 새 로그인 시각을 검증하는 환경이 필요해 bundle에서 보내지 않음. 로컬 가상 사건 시험만 실행' });
+  return base;
+}
+
+// 8단계: 7단계 점검을 이어 쓰고, 공지 구역을 비로그인·가짜 토큰으로 직접 불러 자료 없이 거부되는지 봅니다.
+// 학생 토큰으로 공지 수정·B 토큰으로 A 메모 읽기는 로그인 토큰이 필요해 bundle에서 보내지 않습니다(로컬 시험만).
+async function runStep8Checks(config) {
+  const base = (await runStep7Checks(config)).filter((item) => item.attackId !== 'deployment_identity_present');
+  const app = appUrl(config);
+  const describe = (label, result) => unreached(result) ?? `${label} HTTP ${result.status} · `
+    + (Array.isArray(result.body) ? `자료 ${result.body.length}건 노출` : `오류 ${result.body?.error ?? 'JSON 아님'}`);
+  const identity = await anonymousGet(app, '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 8 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  const list = await anonymousGet(app, '/api/notices');
+  base.push({ attackId: 'anonymous_list_notices', expected: '토큰 없는 공지 목록 요청은 401로 거부', observed: describe('비로그인 GET /api/notices', list) });
+  const forged = await anonymousGet(app, '/api/notices/00000000-0000-4000-8000-000000000000', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged' },
+    body: JSON.stringify({ title: 'forged', role: 'instructor' }),
+  });
+  base.push({ attackId: 'forged_role_notice_update', expected: '가짜 토큰+본문 role로 공지 수정은 401로 거부', observed: describe('가짜 토큰 PUT /api/notices/:id', forged) });
+  try {
+    const { fixtureRequests } = await import('../scripts/fixture-7.mjs');
+    const { decide } = await import('./decider.mjs');
+    const { normal } = fixtureRequests();
+    const at = (method, route, path) => decide({ ...normal, requestId: crypto.randomUUID(), method, route, path });
+    const own = await at('GET', 'GET /notes/:id', '/notes/n1');
+    const notice = await at('PUT', 'PUT /notices/:id', '/notices/x1');
+    const unknown = await at('GET', 'GET /notes/:id/export', '/notes/n1/export');
+    base.push({ attackId: 'decider_zone_local', expected: '로컬 가상 요청: 자기 메모 allow, 공지 수정 deny, 알 수 없는 경로 deny',
+      observed: `로컬 연습(심판 판정 아님) · 자기 메모 ${own.decision} · 공지 수정 ${notice.decision}(${notice.reasonCode}) · 기능 경로 ${unknown.decision}(${unknown.reasonCode})` });
+  } catch (error) {
+    base.push({ attackId: 'decider_zone_local', expected: '로컬 가상 요청: 자기 메모 allow, 공지 수정 deny, 알 수 없는 경로 deny',
+      observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
+  }
+  base.push({ attackId: 'student_notice_update', expected: '학생 토큰으로 공지 수정은 403 INSTRUCTOR_ONLY',
+    observed: '미실행: 학생 로그인 토큰이 필요해 bundle에서 보내지 않음. test/zone.test.mjs 로컬 시험(가짜 DB)에서만 403 확인' });
   return base;
 }
