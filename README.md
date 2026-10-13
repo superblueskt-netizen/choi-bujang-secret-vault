@@ -37,7 +37,8 @@
 - **8단계 「자료마다 갈 수 있는 구역을 나눕니다」:** 커밋 `9f1bfd7`(8단계 저장점)과 판정기 수정 `d33a901`·`6646f68`·`535cd3e`. 마지막 `535cd3e`에서 판정기는 공지 읽기·메모 전체 목록을 거부하고, 메모 한 건 주인 비교는 API에 맡깁니다.
 - **9단계 「도플갱어를 찾고 권한을 거둡니다」:** 커밋 `fdf4960`(9단계 저장점). 탐지 규칙 `burst_read`.
 - **10단계 「백업에서 자료실을 되살립니다」:** 커밋 `43da531`(10단계 저장점)과 `df8e536`(복구 뒤 재시험 결과 기록).
-- **11단계 「나만의 접속 앱을 완성합니다」:** 「11단계 저장점」 커밋. 아래 「11단계」 절이 현재 상태입니다.
+- **11단계 「나만의 접속 앱을 완성합니다」:** 커밋 `5d66f82`(11단계 저장점)과 `fe804b3`(키·토큰을 화면·설정에서 제거, 서버 로그인 쿠키).
+- **12단계 「탈환 작전실을 완성합니다」:** 「12단계 저장점」 커밋(부모 `fe804b3`). 아래 「12단계」 절이 현재 상태이며, 재현 안내는 이 커밋을 기준으로 합니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -260,7 +261,7 @@
 
 로컬 시험(`node --test`, `npm run …:test`)은 가상 요청·가짜 DB 연습이며 심판 판정이 아닙니다.
 
-## 11단계: 현재 작동하는 기능
+## 11단계에서 만든 것 (12단계에도 유지)
 
 - **설치형 웹앱:** `public/manifest.webmanifest`(이름 「BYTE BACK 자료실」, `standalone`), `public/icon.svg`, `public/sw.js`, `public/offline.html`. 서비스 워커는 오프라인 안내 페이지만 보관하고 `/api/` 요청과 자료는 저장하지 않습니다. 앱을 설치했다는 표시만으로는 기기가 확인된 것이 아니라고 화면과 manifest 설명에 적었습니다. 따로 설치하는 접속 프로그램은 없습니다.
 - **기기 승인 흐름** (`src/device-api.mjs`, `api/device/[action].js`, 웹 표준 패스키 WebAuthn, 외부 라이브러리 없음)
@@ -288,3 +289,43 @@
 5. 로컬: `node --test test/device.test.mjs`(4개), 기존 `npm run decider:test`·`node --test test/zone.test.mjs test/restore.test.mjs`가 그대로 통과해야 합니다.
 
 로컬 시험은 가상 패스키·가짜 DB 연습이며 심판 판정이 아닙니다. 1~4는 아직 미실행입니다.
+
+## 12단계: 탈환 작전실
+
+### 화면과 요약 API
+
+- **작전실 화면** `/ops.html` (`public/ops.html`, 자료실 화면 오른쪽 위 「탈환 작전실」 링크)
+  - **서버 요약** (`GET /api/ops/summary`, `src/ops-api.mjs`, 로그인 필요): 배포된 코드의 판정기 `RULE_IDS`·허용 경로, 탐지 규칙(`burst_read` 10분 120건 초과 → `propose_revocation`), 서버 DB의 내 기기 승인·대기·회수 수, 서버 파일의 정책 사본 봉인 검증 결과(버전·해시 앞자리), 서버 DB의 내 복원 감사 기록(최근 10건, 자원 ID는 앞 8자리만)을 돌려줍니다. 응답에는 요약 ID·서버 확인 시각이 있고, 화면에는 요청 ID(`x-vercel-id`)를 함께 표시합니다. 메모 본문·토큰·전체 사용자 ID·공개키는 넣지 않습니다.
+  - **탐지 사건:** 엔진이 검증한 실제 사건을 이 서버로 전달하는 경로가 연결되지 않아 **미실행**으로 표시합니다. 회수 집행도 엔진·심판 몫입니다.
+- **1~11단계 정상·금지 요청 실측표:** 「지금 실측」을 누르면 이 브라우저에서 실제 요청을 보내고, 줄마다 단계·종류(정상/금지)·요청·기대 결과·실제 API 결과(상태 코드와 오류 코드만)·판정(일치/불일치/미실행)·요청 ID(`x-vercel-id`)·확인 시각을 채웁니다.
+  - 모든 줄은 **미실행**에서 시작합니다. 실제로 보낸 요청만 결과가 채워지고, 보내지 않은 줄(로그인 전, 엔진 경로인 6·7·8·9단계 판정기·탐지 시험, 키를 두지 않은 5단계 원본 주소 직접 읽기)은 이유와 함께 미실행으로 남습니다.
+  - 기기 확인 전에는 메모·공지·복원 요청의 기대 결과가 `403 DEVICE_NOT_APPROVED`입니다(11단계 설계). 승인 기기로 확인한 뒤에는 정상 요청 `200`, 남의 자료 `404`·`403`을 기대합니다.
+  - 「결과 JSON 받기」로 표를 내려받습니다. 브라우저 저장소에는 저장하지 않습니다.
+  - 이 표는 학생 실측입니다. 41종 공격 방어 판정은 심판이 하며, 화면의 문구나 「일치」를 통과 근거로 쓰지 않습니다.
+- 확인: `node --test test/ops.test.mjs`(3개: 요약이 서버 값만 쓰고 본문·전체 ID 없음, 비로그인 401, 화면이 미실행을 통과로 바꾸지 않음).
+
+### 출처: 제공 엔진·시작 틀과 학생 작업
+
+- **제공(ALEPH SDP 엔진·시작 틀, 이 저장소의 첫 커밋 `f2aa3b5`에서 받은 파일):** 판정 요청·응답 계약(`docs/DECIDER_REQUEST.md`, `aleph.decision.v1`), 탐지 사건 계약(`docs/DETECT_EVENTS.md`), 로그인 검사기 `src/verify-login.mjs`, 제출 묶음 `scripts/bundle.mjs`, 배포 식별 `scripts/deployment-identity.mjs`·`scripts/build-public.mjs`, 연습 도구 `scripts/decider-test.mjs`·`scripts/detect-test.mjs`·`scripts/fixture-7.mjs`·`scripts/xdr-run.mjs`, `xdr/fixtures/`, `api/ai.js`·`api/threat-intel.js`, `package/` 문서, 시험 `test/r5.test.mjs`·`test/package-starter.test.mjs`·`test/xdr-run.test.mjs`. 실제 판정 요청을 만들어 판정기를 부르고, 기기·신원·경로를 먼저 확인하고, 회수 제안을 집행하는 것은 **ALEPH SDP 엔진(반 엔진·심판)**이 하며 이 저장소에 들어 있지 않습니다.
+- **학생 작성(시작 틀 파일을 고친 것 포함):** 판정기 규칙 `src/decider.mjs`(시작 틀의 기본 거부를 바꿈), 탐지 규칙 `src/detect.mjs`(시작 틀의 `observe` 기본값을 바꿈), 자료 API `src/notes-api.mjs`·`api/notes*`·`api/notices*`·`api/restore/`, 기기 승인 `src/device-api.mjs`·`src/device-session.mjs`·`api/device/`, 서버 로그인 `src/auth-api.mjs`·`api/auth/`, 작전실 `src/ops-api.mjs`·`api/ops/`·`public/ops.html`, 접속 앱 `public/index.html`(시작 틀을 고침)·`manifest.webmanifest`·`sw.js`·`offline.html`·`icon.svg`, 정책 복원 `scripts/policy-restore.mjs`·`backup/`·`policy/`, 자기 점검 `src/attack-check.mjs`(시작 틀을 고침), DB SQL `supabase/*.sql`, 시험 `test/owner·zone·step7·detect·restore·device·auth·ops.test.mjs`, 보너스 `xdr/brute-force·web-injection·known-cve/`.
+- 비밀값(Supabase 서버 키, 비밀번호, 토큰, 패스키 개인키)은 저장소·제출 묶음에 넣지 않습니다. `*.local.sql`, `.env*`, `bundle-notes.json`, `artifacts/`는 `.gitignore`로 뺐습니다.
+
+### 설치·실행·중지·복구 (이 커밋 기준)
+
+| 대상 | 설치 | 실행 | 중지 | 복구 |
+|---|---|---|---|---|
+| 자료실·접속 앱 (Vercel) | GitHub 저장소를 Vercel 프로젝트에 연결하고, Vercel 환경변수에 `SUPABASE_URL`·`SUPABASE_SECRET_KEY`를 학생이 직접 넣습니다. Supabase SQL Editor에서 `supabase/step2~step11` SQL을 차례로 실행합니다(`*.local.sql`은 각자 이메일로). | `git push origin main` → Vercel 자동 배포. 자동 배포가 안 되면 Vercel Deployments → `…` → Create Deployment → `main`. 로컬 화면만: `npm run build -- --local` | Vercel 프로젝트 Settings에서 배포를 멈추거나 이전 배포로 Rollback합니다. 기기 하나만 막을 때는 `vault_devices`의 그 기기를 `revoked`로 바꿉니다. | Vercel에서 이전 정상 배포로 Promote/Rollback하거나, Git에서 정상 커밋을 다시 배포합니다. 메모 한 건은 `POST /api/restore/:id`, 시험 정책은 아래 「정책 복원」 |
+| 기기 승인 | `supabase/step11-devices.sql` 실행 | 화면 「이 기기 승인 요청」 → SQL Editor에서 그 기기만 `approved` → 「이 기기로 확인」 | `update public.vault_devices set status='revoked' where id='<기기 id>'` (다음 요청부터 403) | 다시 `approved`로 바꾸거나 새로 등록 |
+| 학생 판정기 `src/decider.mjs` | 설치 없음(엔진이 `decide(request)`를 부름) | 로컬 연습: `npm run decider:test`, `npm run fixture:7`, `node --test test/zone.test.mjs test/step7.test.mjs` | 엔진 쪽에서 판정기 호출을 멈춥니다(학생이 직접 멈출 수 없음). 판정기는 응답이 없거나 틀리면 엔진이 허용하지 않습니다. | `git log -- src/decider.mjs`로 정상 커밋을 찾아 그 파일만 되돌린 뒤 커밋·push |
+| 탐지 규칙 `src/detect.mjs` | 설치 없음 | 로컬 연습: `npm run detect:test`, `node --test test/detect.test.mjs` | 엔진 쪽 사건 전달을 멈춥니다. | 정상 커밋의 파일로 되돌림 |
+| 정책 복원 | `backup/policy-safe.json`·`.sha256` (커밋에 포함) | `npm run policy:diff` (미리 보기) | `--yes` 없이 실행하면 아무것도 바꾸지 않습니다. | `npm run policy:restore -- --apply --yes` (notes 서비스만, 감사 로그 추가) |
+| 탈환 작전실 | 위 자료실 배포에 포함 | `/ops.html` → 「지금 실측」 → 「결과 JSON 받기」 | 화면을 닫으면 끝(서버에 남는 상태 없음) | — |
+| 제출 묶음 | `npm install` | `npm run bundle` (공개 키 점검까지 하려면 그 셸에만 `ALEPH_PUBLIC_DATA_API_KEY` 환경변수를 넣음, 값은 저장하지 않음) | — | — |
+
+### 재현 순서
+
+1. `git clone` 후 `npm install`.
+2. 로컬 시험: `npm run decider:test` · `npm run fixture:7` · `npm run detect:test` · `npm run policy:diff` · `node --test test/owner.test.mjs test/zone.test.mjs test/step7.test.mjs test/detect.test.mjs test/restore.test.mjs test/device.test.mjs test/auth.test.mjs test/ops.test.mjs`
+3. 배포 주소에서 로그인 → `/ops.html` 「지금 실측」 → 결과 JSON을 받아 둡니다.
+4. `npm run bundle` → `artifacts/submission.json`의 자기 점검을 확인합니다.
+5. 실행하지 않은 시험은 미실행으로 둡니다. 심판의 41종 판정은 포털에서 확인합니다.

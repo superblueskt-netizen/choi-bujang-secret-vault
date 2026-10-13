@@ -16,7 +16,7 @@
   ],
   "functions": {
     "api/**/*.js": {
-      "includeFiles": "aleph.config.json"
+      "includeFiles": "{aleph.config.json,backup/**,policy/**}"
     }
   }
 }

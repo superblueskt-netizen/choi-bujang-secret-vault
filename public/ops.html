@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BYTE BACK | 탈환 작전실</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+    body { margin: 0; background: #101a28; color: #ecf4ff; }
+    main { max-width: 1080px; margin: 0 auto; padding: 36px 20px 64px; }
+    .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+    h1 { margin: 12px 0 8px; font-size: clamp(28px, 6vw, 40px); }
+    h2 { font-size: 19px; margin: 0 0 10px; }
+    p, li { color: #bfd0e5; line-height: 1.6; }
+    .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .panel { border: 1px solid #51667c; border-radius: 14px; background: #1a2a3d; padding: 16px; margin: 16px 0; }
+    .card { border: 1px solid #51667c; border-radius: 12px; background: #132235; padding: 14px; }
+    .card h3 { margin: 0 0 8px; font-size: 15px; color: #8ad8df; }
+    .src { font-size: 12px; color: #8fa3ba; }
+    code { font-size: 13px; color: #d6e6f7; }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; background: #8ad8df; color: #0b1520; }
+    button.ghost { background: transparent; color: #8ad8df; border: 1px solid #8ad8df; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #2c3f55; vertical-align: top; }
+    th { color: #8ad8df; font-weight: 700; white-space: nowrap; }
+    .ok { color: #9be7a6; font-weight: 700; } .bad { color: #ff9fae; font-weight: 700; } .skip { color: #e0c27a; font-weight: 700; }
+    .error { color: #ffb4c0; }
+    a { color: #8ad8df; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">BYTE BACK · 12단계</div>
+  <h1>탈환 작전실</h1>
+  <p>이 화면의 숫자는 서버 API가 실제로 돌려준 값과, 이 브라우저에서 방금 보낸 요청의 실제 응답만 씁니다. 화면에 뜬 문구는 통과 근거가 아니며, 41종 공격 방어 판정은 심판이 합니다. 메모 본문은 표시하지 않습니다.</p>
+  <p class="error" id="login-needed" hidden>로그인이 필요합니다. <a href="/">자료실</a>에서 로그인한 뒤 다시 여세요. 로그인 없이도 아래 표의 비로그인 시험은 실행할 수 있습니다.</p>
+
+  <section class="panel">
+    <div class="row" style="justify-content: space-between">
+      <h2>서버 요약</h2>
+      <button class="ghost" id="reload-summary" type="button">다시 읽기</button>
+    </div>
+    <p class="src" id="summary-meta">아직 읽지 않았습니다.</p>
+    <div class="grid">
+      <div class="card"><h3>판정기 규칙</h3><div id="s-decider">—</div></div>
+      <div class="card"><h3>탐지 규칙·사건</h3><div id="s-detect">—</div></div>
+      <div class="card"><h3>회수 상태 (내 기기)</h3><div id="s-revoke">—</div></div>
+      <div class="card"><h3>복구 버전·복원 기록</h3><div id="s-restore">—</div></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row" style="justify-content: space-between">
+      <h2>1~11단계 정상·금지 요청 실측표</h2>
+      <div class="row">
+        <button id="run" type="button">지금 실측</button>
+        <button class="ghost" id="download" type="button" disabled>결과 JSON 받기</button>
+      </div>
+    </div>
+    <p class="src" id="run-meta">실측 전입니다. 모든 줄은 '미실행'으로 시작하며, 실제로 보낸 요청만 결과가 채워집니다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>단계</th><th>종류</th><th>요청</th><th>기대 결과</th><th>실제 API 결과</th><th>판정</th><th>요청 ID (x-vercel-id)</th><th>확인 시각</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script type="module">
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const FAKE_ID = '00000000-0000-4000-8000-0000000000aa';
+  const FORGED = 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged';
+
+  // ---------- 서버 요약 ----------
+  async function loadSummary() {
+    const res = await fetch('/api/ops/summary', { cache: 'no-store' });
+    const body = await res.json().catch(() => null);
+    if (res.status === 401) { $('login-needed').hidden = false; $('summary-meta').textContent = '로그인 전이라 서버 요약을 읽지 않았습니다(401).'; return null; }
+    if (!res.ok) { $('summary-meta').textContent = `서버 요약 읽기 실패 HTTP ${res.status}`; return null; }
+    $('login-needed').hidden = true;
+    $('summary-meta').textContent = `요약 ID ${body.summaryId} · 요청 ID ${res.headers.get('x-vercel-id') ?? '없음'} · 서버 확인 ${body.checkedAt}`;
+    $('s-decider').innerHTML = `<p>규칙 ${body.decider.ruleIds.length}개: <code>${body.decider.ruleIds.map(esc).join(', ')}</code></p><p>허용 경로 모양: <code>${body.decider.zoneRoutes.map(esc).join(' · ')}</code></p><p class="src">출처: 배포된 판정기 코드</p>`;
+    const r = body.detection.rule;
+    $('s-detect').innerHTML = `<p><code>${esc(r.id)}</code>: 같은 사용자 GET ${r.windowMinutes}분 안 ${r.limit}건 초과 → <code>${esc(r.action)}</code></p><p>실제 사건: <span class="skip">${esc(body.detection.events.status)}</span> — ${esc(body.detection.events.reason)}</p><p class="src">출처: 배포된 탐지 코드</p>`;
+    const v = body.revocation;
+    $('s-revoke').innerHTML = v.status ? `<p class="bad">${esc(v.status)} (${esc(v.error)})</p>` : `<p>승인 ${v.approved} · 대기 ${v.pending} · 회수 ${v.revoked}</p><p class="src">출처: 서버 DB vault_devices (내 기기만)</p>`;
+    const p = body.policy; const a = body.restores;
+    $('s-restore').innerHTML = (p.verified ? `<p>정책 사본 <code>${esc(p.version)}</code> 봉인 검증 <span class="ok">통과</span> (<code>${esc(p.sha256Prefix)}…</code>)</p>` : `<p>정책 사본 검증 <span class="bad">실패</span> (${esc(p.error)})</p>`)
+      + (a.status ? `<p class="bad">복원 기록 ${esc(a.status)}</p>` : `<p>내 복원 기록 ${a.count}건${a.recent.length ? ': ' + a.recent.map((x) => `${esc(x.result)} ${esc(x.resource)}`).join(', ') : ''}</p>`)
+      + `<p class="src">출처: 서버 파일(backup/) · 서버 DB vault_audit</p>`;
+    return body;
+  }
+
+  // ---------- 실측표 ----------
+  // ctx.login: 로그인 쿠키 있음, ctx.verified: 서버가 승인 기기 세션을 확인함. 둘에 따라 기대 결과가 달라지는 줄은 실측 시점에 정합니다.
+  const deny = (codes) => (s) => codes.includes(s);
+  const CASES = [
+    { step: '1·2', kind: '금지', req: 'GET /data.json (공개 메모 파일)', run: () => go('/data.json', { omit: true }), expect: () => ['404 (공개 파일 없음)', deny([404])] },
+    { step: '2', kind: '정상', req: 'GET /aleph.json (배포 식별)', run: () => go('/aleph.json', { omit: true }), expect: () => ['200', deny([200])] },
+    { step: '3', kind: '금지', req: 'GET /api/notes 로그인 없음', run: () => go('/api/notes', { omit: true }), expect: () => ['401 LOGIN_REQUIRED', deny([401])] },
+    { step: '3', kind: '금지', req: 'GET /api/notes 가짜 토큰', run: () => go('/api/notes', { omit: true, auth: FORGED }), expect: () => ['401 LOGIN_REQUIRED', deny([401])] },
+    { step: '3', kind: '정상', need: 'login', req: 'GET /api/auth/me 내 로그인', run: () => go('/api/auth/me'), expect: () => ['200', deny([200])] },
+    { step: '4', kind: '금지', need: 'login', req: 'GET /api/notes/:id 남의(없는) 메모', run: () => go(`/api/notes/${FAKE_ID}`), expect: (c) => c.verified ? ['404', deny([404])] : ['403 기기 미승인', deny([403])] },
+    { step: '4', kind: '금지', need: 'login', req: 'DELETE /api/notes/:id 남의(없는) 메모', run: () => go(`/api/notes/${FAKE_ID}`, { method: 'DELETE' }), expect: (c) => c.verified ? ['404', deny([404])] : ['403 기기 미승인', deny([403])] },
+    { step: '5', kind: '금지', req: '원본 Supabase 주소 직접 읽기', skip: '공개 키 값을 화면·Git에 두지 않아 브라우저에서 보낼 수 없음(npm run bundle에서 환경변수로만 실행)' },
+    { step: '6', kind: '금지', req: '미등록 기기 요청 (판정기)', skip: '엔진 경로 — 판정기는 심판·반 엔진이 호출. 로컬: npm run decider:test' },
+    { step: '7', kind: '금지', req: '복합 이상 접속 재확인 (판정기)', skip: '엔진 경로 — 로컬: npm run fixture:7' },
+    { step: '8', kind: '정상', need: 'login', req: 'GET /api/notices 공지 목록', run: () => go('/api/notices'), expect: (c) => c.verified ? ['200', deny([200])] : ['403 기기 미승인', deny([403])] },
+    { step: '8', kind: '금지', need: 'login', req: 'PUT /api/notices/:id 본문 role=instructor', run: () => go(`/api/notices/${FAKE_ID}`, { method: 'PUT', body: { title: 'x', role: 'instructor' } }), expect: (c) => c.verified ? ['403 INSTRUCTOR_ONLY', deny([403])] : ['403 기기 미승인', deny([403])] },
+    { step: '8', kind: '금지', req: '메모 전체 목록·공지 쓰기 (판정기)', skip: '엔진 경로 — 로컬: node --test test/zone.test.mjs' },
+    { step: '9', kind: '금지', req: '10분 121건 폭주 조회 회수 제안', skip: '엔진이 사건을 전달하는 경로 미연결 — 로컬: npm run detect:test' },
+    { step: '10', kind: '금지', req: 'POST /api/restore/:id 로그인 없음', run: () => go(`/api/restore/${FAKE_ID}`, { method: 'POST', omit: true }), expect: () => ['401', deny([401])] },
+    { step: '10', kind: '금지', need: 'login', req: 'POST /api/restore/:id 남의(없는) 사본', run: () => go(`/api/restore/${FAKE_ID}`, { method: 'POST' }), expect: (c) => c.verified ? ['404', deny([404])] : ['403 기기 미승인', deny([403])] },
+    { step: '11', kind: '정상', req: 'GET /manifest.webmanifest', run: () => go('/manifest.webmanifest', { omit: true }), expect: () => ['200', deny([200])] },
+    { step: '11', kind: '정상', need: 'login', req: 'GET /api/device/status', run: () => go('/api/device/status'), expect: () => ['200', deny([200])] },
+    { step: '11', kind: '금지', need: 'login', req: 'GET /api/notes 기기 확인 전', run: () => go('/api/notes'), expect: (c) => c.verified ? ['(이미 확인된 기기 — 정상 200)', deny([200])] : ['403 DEVICE_NOT_APPROVED', deny([403])] },
+    { step: '11', kind: '금지', req: 'GET /api/device/status 로그인 없음', run: () => go('/api/device/status', { omit: true }), expect: () => ['401', deny([401])] },
+    { step: '12', kind: '정상', need: 'login', req: 'GET /api/ops/summary', run: () => go('/api/ops/summary'), expect: () => ['200', deny([200])] },
+  ];
+
+  async function go(path, { method = 'GET', omit = false, auth, body } = {}) {
+    const res = await fetch(path, { method, cache: 'no-store', credentials: omit ? 'omit' : 'same-origin',
+      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(auth ? { Authorization: auth } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}) });
+    let code = '';
+    try { const j = await res.clone().json(); code = Array.isArray(j) ? `배열 ${j.length}건` : (j?.error ?? ''); } catch { /* JSON 아님 */ }
+    return { status: res.status, code, requestId: res.headers.get('x-vercel-id') ?? '' };
+  }
+
+  let results = CASES.map((c, i) => ({ no: i + 1, step: c.step, kind: c.kind, request: c.req, expected: c.skip ? '—' : '', actual: '', verdict: '미실행', requestId: '', checkedAt: '', note: c.skip ?? '' }));
+  function draw() {
+    $('rows').innerHTML = results.map((r) => `<tr><td>${r.no}</td><td>${esc(r.step)}</td><td>${esc(r.kind)}</td><td>${esc(r.request)}</td><td>${esc(r.expected)}</td><td>${esc(r.actual || r.note)}</td><td class="${r.verdict === '일치' ? 'ok' : r.verdict === '불일치' ? 'bad' : 'skip'}">${esc(r.verdict)}</td><td><code>${esc(r.requestId)}</code></td><td>${esc(r.checkedAt)}</td></tr>`).join('');
+  }
+
+  async function runAll() {
+    $('run').disabled = true;
+    const me = await go('/api/auth/me');
+    const login = me.status === 200;
+    let verified = false;
+    if (login) { const st = await fetch('/api/device/status', { cache: 'no-store' }).then((r) => r.json()).catch(() => null); verified = Boolean(st?.verified); }
+    const ctx = { login, verified };
+    results = [];
+    for (const [i, c] of CASES.entries()) {
+      const base = { no: i + 1, step: c.step, kind: c.kind, request: c.req, requestId: '', checkedAt: '' };
+      if (c.skip) { results.push({ ...base, expected: '—', actual: '', verdict: '미실행', note: c.skip }); continue; }
+      if (c.need === 'login' && !login) { results.push({ ...base, expected: '로그인 필요', actual: '', verdict: '미실행', note: '로그인하지 않아 보내지 않음' }); continue; }
+      const [expectedText, ok] = c.expect(ctx);
+      try {
+        const r = await c.run();
+        results.push({ ...base, expected: expectedText, actual: `${r.status}${r.code ? ' ' + r.code : ''}`, verdict: ok(r.status) ? '일치' : '불일치', requestId: r.requestId, checkedAt: new Date().toISOString(), note: '' });
+      } catch (error) {
+        results.push({ ...base, expected: expectedText, actual: '', verdict: '미실행', note: `요청 실패: ${error.message}`, checkedAt: new Date().toISOString() });
+      }
+      draw();
+    }
+    const n = (v) => results.filter((r) => r.verdict === v).length;
+    $('run-meta').textContent = `실측 ${new Date().toISOString()} · 로그인 ${login ? '예' : '아니오'} · 기기 확인 ${verified ? '예' : '아니오'} · 일치 ${n('일치')} · 불일치 ${n('불일치')} · 미실행 ${n('미실행')} (표 ${results.length}줄. 41종 공격 판정은 심판이 하며 이 표는 학생 실측입니다)`;
+    draw();
+    $('download').disabled = false;
+    $('run').disabled = false;
+  }
+
+  $('download').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({ page: location.origin + '/ops.html', results }, null, 2)], { type: 'application/json' });
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `ops-check-${Date.now()}.json` });
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  $('run').addEventListener('click', runAll);
+  $('reload-summary').addEventListener('click', loadSummary);
+  draw();
+  loadSummary();
+</script>
+</body>
+</html>

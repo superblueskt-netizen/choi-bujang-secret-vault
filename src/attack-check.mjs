@@ -11,6 +11,7 @@ export async function runAttackChecks(config) {
   if (config.step === 9) return runStep9Checks(config);
   if (config.step === 10) return runStep10Checks(config);
   if (config.step === 11) return runStep11Checks(config);
+  if (config.step === 12) return runStep12Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -292,5 +293,28 @@ async function runStep11Checks(config) {
     observed: unreached(fakeCookie) ?? `가짜 쿠키 GET /api/notes HTTP ${fakeCookie.status} · 오류 ${fakeCookie.body?.error ?? 'JSON 아님'}` });
   base.push({ attackId: 'approved_device_opens_vault', expected: '승인 전 자료 없음(403), 서버 승인·패스키 확인 뒤 기존 화면 정상',
     observed: '미실행: 로그인과 기기 패스키가 필요해 bundle에서 보내지 않음. test/device.test.mjs 로컬 시험(가상 패스키·가짜 DB)에서만 확인' });
+  return base.slice(-20);
+}
+
+// 12단계: 11단계 점검을 이어 쓰고, 작전실 화면·요약 API를 로그인 없이 불러 봅니다.
+// 로그인한 작전실 실측표는 브라우저(/ops.html)에서만 만들므로 여기서는 미실행으로 남깁니다.
+async function runStep12Checks(config) {
+  const base = (await runStep11Checks(config)).filter((item) => !['deployment_identity_present', 'approved_device_opens_vault',
+    'cross_owner_note_access', 'student_notice_update', 'decider_zone_local'].includes(item.attackId));
+  const app = appUrl(config);
+  const identity = await anonymousGet(app, '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 12 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  const summary = await anonymousGet(app, '/api/ops/summary');
+  base.push({ attackId: 'anonymous_ops_summary', expected: '로그인 없는 작전실 요약 요청은 401', observed: unreached(summary) ?? `비로그인 GET /api/ops/summary HTTP ${summary.status} · 오류 ${summary.body?.error ?? 'JSON 아님'}` });
+  let page;
+  try {
+    const res = await fetch(new URL('/ops.html', app), { redirect: 'error', signal: AbortSignal.timeout(10000) });
+    const html = await res.text();
+    page = `GET /ops.html HTTP ${res.status} · 키 값 ${/sb_publishable_|sb_secret_/u.test(html) ? '있음' : '없음'}`;
+  } catch (error) { page = `요청 실패(${error.name}) · 미실행과 같음, 판정 근거로 쓰지 않음`; }
+  base.push({ attackId: 'ops_page_present', expected: '작전실 화면이 있고 키 값이 없음', observed: page });
+  base.push({ attackId: 'ops_live_matrix', expected: '로그인한 브라우저에서 1~11단계 정상·금지 요청을 실측해 요청 ID·시각과 함께 기록',
+    observed: '미실행: 로그인 쿠키가 필요해 bundle에서 보내지 않음. /ops.html 「지금 실측」에서만 만들고 결과 JSON을 내려받음' });
   return base.slice(-20);
 }

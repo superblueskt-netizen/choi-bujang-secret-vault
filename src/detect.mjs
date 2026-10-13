@@ -7,6 +7,9 @@ const WINDOW_MS = 10 * 60 * 1000;   // 10분 구간
 const BURST_LIMIT = 120;            // 120건까지는 정상, 121건부터 의심
 const SUBJECT = /^[A-Za-z0-9_.:-]{1,128}$/u;
 
+// 12단계 작전실 표시용(읽기 전용): 실제로 쓰는 탐지 규칙 값
+export const DETECT_RULE = Object.freeze({ id: 'burst_read', windowMinutes: WINDOW_MS / 60000, limit: BURST_LIMIT, action: 'propose_revocation' });
+
 // 입력 정리: 형식이 맞는 GET 사건만 {sub, t} 두 값으로 줄입니다. 틀린 사건은 세지 않습니다.
 export function readEvents(events) {
   if (!Array.isArray(events)) throw new TypeError('invalid_detection_events');
