@@ -3,7 +3,7 @@
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 // 계약(docs/DECIDER_REQUEST.md)에 있는 최상위 값만 읽습니다.
 export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required',
-  'zone_route_allowlist', 'zone_own_notes', 'zone_notices_read', 'zone_notice_write']);
+  'zone_route_allowlist', 'zone_own_notes', 'zone_notice_write']);
 
 // 7단계 입력 검사 기준
 // - signals는 엔진이 넘긴 값만 씁니다. 브라우저 헤더·위치는 판정기에 들어오지 않고, 읽지도 않습니다.
@@ -50,6 +50,7 @@ export function readStepUp(request) {
 }
 
 // 8단계 구역 표: 엔진이 확인한 메서드·경로(route)·실제 경로(path)가 정확히 맞는 것만 구역을 받습니다.
+// 학생에게 허용하는 구역은 자기 메모뿐입니다. 공지(강사 구역)는 읽기·수정 모두 판정기에서 허용하지 않습니다.
 // 자료는 경로의 :id 한 칸으로만 고르고, 쿼리로 기능을 고르지 않습니다. :id와 같은 깊이에 export 같은 기능 경로는 두지 않습니다.
 const ID_SEGMENT = '[A-Za-z0-9_-]{1,64}';
 const ZONES = Object.freeze({
@@ -58,8 +59,6 @@ const ZONES = Object.freeze({
   'GET /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'PUT /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'DELETE /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
-  'GET /notices': { zone: 'notices_read', rule: 'zone_notices_read', path: '/notices' },
-  'GET /notices/:id': { zone: 'notices_read', rule: 'zone_notices_read', path: `/notices/${ID_SEGMENT}` },
   'PUT /notices/:id': { zone: 'notice_write', rule: 'zone_notice_write', path: `/notices/${ID_SEGMENT}` },
 });
 export function readZone(request) {

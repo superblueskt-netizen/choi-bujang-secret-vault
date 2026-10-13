@@ -18,11 +18,12 @@ test('판정기: 자기 메모 읽기·수정은 허용하고 구역 규칙 이�
   }
 });
 
-test('판정기: 공지 수정은 역할 계약이 없어 거부, 공지 읽기는 허용', async () => {
+test('판정기: 공지 수정은 역할 계약이 없어 거부, 공지(강사 구역) 읽기·목록도 거부', async () => {
   const write = await decide(req('PUT', 'PUT /notices/:id', '/notices/x1'));
   assert.equal(write.decision, 'deny');
   assert.equal(write.reasonCode, 'instructor_role_unverified');
-  assert.equal((await decide(req('GET', 'GET /notices/:id', '/notices/x1'))).decision, 'allow');
+  assert.equal((await decide(req('GET', 'GET /notices/:id', '/notices/x1'))).decision, 'deny');
+  assert.equal((await decide(req('GET', 'GET /notices', '/notices'))).decision, 'deny');
 });
 
 test('판정기: 알 수 없는 경로·메서드 불일치·쿼리·기능 경로는 거부', async () => {
