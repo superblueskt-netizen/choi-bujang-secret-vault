@@ -6,6 +6,7 @@ export async function runAttackChecks(config) {
   if (config.step === 4) return runStep4Checks(config);
   if (config.step === 5) return runStep5Checks(config);
   if (config.step === 6) return runStep6Checks(config);
+  if (config.step === 7) return runStep7Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -157,5 +158,27 @@ async function runStep6Checks(config) {
   }
   base.push({ attackId: 'unregistered_device_access', expected: '미등록 기기로 자료실 읽기 요청은 거부',
     observed: '미실행: 미등록 기기 요청은 심판이 보내며 bundle에서 보내지 않음' });
+  return base;
+}
+
+// 7단계: 6단계 점검을 이어 쓰고, step_up_required 규칙을 로컬 가상 사건으로 확인합니다.
+// 재로그인 전 실제 자료 차단은 제공 엔진이 새 로그인 시각(stepUp)을 검증하는 환경에서만 잴 수 있어 미실행으로 남깁니다.
+async function runStep7Checks(config) {
+  const base = (await runStep6Checks(config)).filter((item) => !['deployment_identity_present', 'decider_device_registered_local'].includes(item.attackId));
+  const identity = await anonymousGet(appUrl(config), '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 7 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  try {
+    const { checkDecider } = await import('../scripts/decider-test.mjs');
+    const { decide, RULE_IDS } = await import('./decider.mjs');
+    const results = await checkDecider({ decide, ruleIds: RULE_IDS });
+    base.push({ attackId: 'decider_rules_local', expected: '로컬 가상 요청: 등록 allow, 미등록 deny, 복합 이상 step_up, 재확인 뒤 allow',
+      observed: `로컬 연습(심판 판정 아님) · ${results.map((r) => `${r.name} ${r.passed ? '통과' : '확인 필요'}`).join(' · ')}`.slice(0, 300) });
+  } catch (error) {
+    base.push({ attackId: 'decider_rules_local', expected: '로컬 가상 요청: 등록 allow, 미등록 deny, 복합 이상 step_up, 재확인 뒤 allow',
+      observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });
+  }
+  base.push({ attackId: 'step_up_before_reauth_block', expected: '복합 이상 접속은 새 로그인 전 자료 없음, 새 로그인 뒤 요청은 허용',
+    observed: '미실행: 제공 엔진이 새 로그인 시각을 검증하는 환경이 필요해 bundle에서 보내지 않음. 로컬 가상 사건 시험만 실행' });
   return base;
 }

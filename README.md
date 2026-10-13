@@ -32,7 +32,8 @@
 - **4단계 「로그인해도 내 자료만 보이게 합니다」:** 커밋 `64bfad7`(4단계 저장점). 커밋 뒤 학습 DB에 `step4-owners.local.sql`(A 4건·B 1건)과 RLS·최소 권한 SQL을 실제로 실행했습니다.
 - **5단계 「자료 요청을 서버 한곳으로 모읍니다」:** 커밋 `9370122`(5단계 저장점). 원본 주소 직접 권한 회수.
 - **보너스 xdr-01·xdr-02:** 커밋 `8217d0b`(brute-force), `0007c87`(web-injection). `xdr/` 폴더만 바꿨습니다. 자세한 내용은 [xdr/README.md](xdr/README.md).
-- **6단계 「등록한 기기만 자료실에 들어옵니다」:** 「6단계 저장점」 커밋. 아래 「6단계」 절이 현재 상태입니다.
+- **6단계 「등록한 기기만 자료실에 들어옵니다」:** 커밋 `d6ca34b`(6단계 저장점). 판정기 `device_registered` 규칙.
+- **7단계 「평소와 다른 접속은 다시 확인합니다」:** 「7단계 저장점」 커밋. 아래 「7단계」 절이 현재 상태입니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -131,9 +132,9 @@
 
 - 화면 코드에는 아직 Supabase 공개 키(`sb_publishable_…`)가 있습니다. 로그인까지 서버 함수로 옮기면 없앨 수 있지만, 로그인이 깨질 위험이 있어 이번에는 하지 않았습니다.
 
-## 6단계: 현재 작동하는 기능
+## 6단계에서 만든 것 (7단계에도 유지)
 
-- **판정기 규칙 `device_registered`** (`src/decider.mjs`): 반 엔진이 보낸 판정 요청의 최상위 값 `deviceRegistered`가 `true`일 때만 `allow`(`approved`)를 돌려줍니다. `false`이거나 값이 없거나 다른 값이면 `deny`와 이유 코드 `device_not_registered`로 거부합니다. `RULE_IDS`는 실제 구현한 `['device_registered']`만 남겼습니다(시작 틀의 `starter.deny`는 더 쓰지 않아 뺐습니다).
+- **판정기 규칙 `device_registered`** (`src/decider.mjs`): 반 엔진이 보낸 판정 요청의 최상위 값 `deviceRegistered`가 `true`일 때만 `allow`(`approved`)를 돌려줍니다. `false`이거나 값이 없거나 다른 값이면 `deny`와 이유 코드 `device_not_registered`로 거부합니다. 6단계 당시 `RULE_IDS`는 `['device_registered']`만 남겼습니다(시작 틀의 `starter.deny`는 더 쓰지 않아 뺐습니다).
 - 계약(`docs/DECIDER_REQUEST.md`)에 있는 값만 읽습니다. `request.device`·`request.identity` 같은 값은 만들지 않았습니다. `decide(request)` 이름·인자와 응답 다섯 항목(`schema`·`requestId`·`decision`·`reasonCode`·`ruleIds`)은 그대로입니다.
 - 이번 단계에는 설치할 접속 프로그램이 없습니다. 인증서·CA·서명 키·기기 개인키를 만들거나 Git에 넣지 않았습니다.
 - 기존 자료실 주소, 화면, 로그인·소유자 검사, 서버 함수는 바꾸지 않았습니다.
@@ -146,3 +147,19 @@
 4. 하나라도 `확인 필요`가 나오면 `src/decider.mjs`의 `RULE_IDS`와 `deviceRegistered` 비교를 먼저 봅니다.
 
 이 시험은 가상 요청으로 하는 로컬 연습이며 심판 판정이 아닙니다. 미등록 기기로 들어오는 실제 공격 요청은 심판이 보냅니다. `npm run bundle`의 자기 점검에도 이 공격은 **미실행**으로 기록합니다.
+
+## 7단계: 현재 작동하는 기능
+
+- **입력 검사** (`src/decider.mjs`의 `readSignals`·`readRecentEvents`·`readStepUp`): 판정기는 엔진이 넘긴 판정 요청의 최상위 값만 읽고, 브라우저 헤더나 위치는 읽지 않습니다. `signals.source`가 `judge_fixture`(심판의 가상 사건)일 때만 지역·네트워크·시각을 씁니다. `none`(실제 경로, 정보 없음)이나 목록에 없는 출처(예: `client_header`)는 모두 `unknown`/`null`로 두고, 빠진 값도 정상값으로 채우지 않습니다.
+- **규칙 `step_up_required`:** 평소와 다른 시각(0~5시) + 처음 보는 네트워크(`unusual`) + 최근 600초 안 대량 읽기 사건(`risk_signal`·`bulk_read` 합계 10건 이상)이 **모두** 겹치면 `step_up`과 이유 코드 `step_up_required`를 돌려줍니다. 지역은 조건에 넣지 않았고, 이 규칙은 `deny`(영구 차단)를 하지 않습니다.
+- **다시 확인:** 엔진이 검증한 `stepUp.verified === true`이고 `authAgeSeconds`가 0~900초일 때만 복합 이상 요청을 허용합니다. 그 밖(`'true'` 문자열, 나이 없음, 900초 초과)은 계속 `step_up`입니다.
+- **기기 규칙 유지:** `device_registered`가 먼저 돌고, 미등록 기기는 `deny`·`device_not_registered`입니다. `RULE_IDS` = `['device_registered', 'step_up_required']`.
+- 판정 요청 계약에는 `stepUp`(엔진이 확인한 새 로그인 시각)이 있습니다. 다만 재로그인 전 실제 자료 차단과 새 로그인 뒤 허용은 제공 엔진이 그 시각을 검증하는 환경에서만 잴 수 있어, `npm run bundle`의 자기 점검에는 **미실행**으로 남깁니다. 토큰 원문은 어디에도 기록하지 않습니다.
+
+### 확인 순서
+
+1. `npm run decider:test` → 네 줄 모두 `통과`여야 합니다(등록 기기 정상, 미등록 기기, 복합 이상 접속 → `step_up`, 다시 확인한 복합 이상 접속 → `allow`).
+2. `npm run fixture:7` → `정상 사건: allow`, `복합 이상 사건: step_up`.
+3. `node --test test/step7.test.mjs` → 위조 출처가 신뢰 값으로 승격되지 않음, 빠진 값을 정상값으로 채우지 않음, 지역만 다르면 허용, 만료된 재로그인은 다시 `step_up`, 기기 규칙 유지. 6개 모두 통과여야 합니다.
+
+이 시험들은 가상 요청으로 하는 로컬 연습이며 심판 판정이 아닙니다.
