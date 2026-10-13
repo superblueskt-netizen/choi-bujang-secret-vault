@@ -43,8 +43,8 @@ test('작전실 요약: 로그인 없으면 401', async () => {
   assert.equal((await call(null)).status, 401);
 });
 
-test('작전실 화면: 미실행을 통과로 바꾸는 코드가 없고 본문을 그리지 않는다', () => {
+test('작전실 화면: /api/checks 응답을 그대로 그리고 따로 계산한 실측표가 없다', () => {
   const html = readFileSync('public/ops.html', 'utf8');
-  assert.match(html, /verdict: '미실행'/u);
-  assert.doesNotMatch(html, /\.body\b(?!:)|note\.body|title\s*\+/u);
+  assert.match(html, /fetch\('\/api\/checks'/u);
+  assert.doesNotMatch(html, /CASES|runAll|note\.body/u);
 });

@@ -27,7 +27,8 @@
     "POST /api/auth/login",
     "GET /api/auth/me",
     "POST /api/auth/logout",
-    "GET /api/ops/summary"
+    "GET /api/ops/summary",
+    "GET /api/checks"
   ],
   "originalApiUrl": "https://giixryoqzyamfedhnnpt.supabase.co/rest/v1/vault_notes",
   "restoreRoute": "POST /api/restore/:id"

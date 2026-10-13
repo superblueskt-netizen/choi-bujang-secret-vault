@@ -297,19 +297,19 @@
 - **작전실 화면** `/ops.html` (`public/ops.html`, 자료실 화면 오른쪽 위 「탈환 작전실」 링크)
   - **서버 요약** (`GET /api/ops/summary`, `src/ops-api.mjs`, 로그인 필요): 배포된 코드의 판정기 `RULE_IDS`·허용 경로, 탐지 규칙(`burst_read` 10분 120건 초과 → `propose_revocation`), 서버 DB의 내 기기 승인·대기·회수 수, 서버 파일의 정책 사본 봉인 검증 결과(버전·해시 앞자리), 서버 DB의 내 복원 감사 기록(최근 10건, 자원 ID는 앞 8자리만)을 돌려줍니다. 응답에는 요약 ID·서버 확인 시각이 있고, 화면에는 요청 ID(`x-vercel-id`)를 함께 표시합니다. 메모 본문·토큰·전체 사용자 ID·공개키는 넣지 않습니다.
   - **탐지 사건:** 엔진이 검증한 실제 사건을 이 서버로 전달하는 경로가 연결되지 않아 **미실행**으로 표시합니다. 회수 집행도 엔진·심판 몫입니다.
-- **1~11단계 정상·금지 요청 실측표:** 「지금 실측」을 누르면 이 브라우저에서 실제 요청을 보내고, 줄마다 단계·종류(정상/금지)·요청·기대 결과·실제 API 결과(상태 코드와 오류 코드만)·판정(일치/불일치/미실행)·요청 ID(`x-vercel-id`)·확인 시각을 채웁니다.
-  - 모든 줄은 **미실행**에서 시작합니다. 실제로 보낸 요청만 결과가 채워지고, 보내지 않은 줄(로그인 전, 엔진 경로인 6·7·8·9단계 판정기·탐지 시험, 키를 두지 않은 5단계 원본 주소 직접 읽기)은 이유와 함께 미실행으로 남습니다.
-  - 기기 확인 전에는 메모·공지·복원 요청의 기대 결과가 `403 DEVICE_NOT_APPROVED`입니다(11단계 설계). 승인 기기로 확인한 뒤에는 정상 요청 `200`, 남의 자료 `404`·`403`을 기대합니다.
-  - 「결과 JSON 받기」로 표를 내려받습니다. 브라우저 저장소에는 저장하지 않습니다.
-  - 이 표는 학생 실측입니다. 41종 공격 방어 판정은 심판이 하며, 화면의 문구나 「일치」를 통과 근거로 쓰지 않습니다.
-- 확인: `node --test test/ops.test.mjs`(3개: 요약이 서버 값만 쓰고 본문·전체 ID 없음, 비로그인 401, 화면이 미실행을 통과로 바꾸지 않음).
+- **점검 결과** (`GET /api/checks`, `src/checks.mjs`·`src/checks-api.mjs`·`src/rule-cases.mjs`, 로그인 불필요): 제출 묶음(`npm run bundle`)과 **같은 목록·같은 함수**로 서버가 자기 공개 주소에 점검 요청을 실제로 보내고 `{checkedAt, commit, total, blocked, failed, notRun, attempts}`를 돌려줍니다. 작전실 화면은 이 응답을 그대로 그리며 따로 계산하지 않습니다.
+  - 점검은 20건이고 GET만 보냅니다. 점검 하나에 요청은 한 건이고 전체는 24건 이하입니다. `observed`에는 `HTTP 401`, `HTTP 200; jsonReady=true` 같은 사실만 적고 설명은 `expected`에 둡니다. 요청마다 고유한 `requestKey`(UUID)를 `alephEvidence`에 남깁니다.
+  - 쓰기 요청이 필요한 2건(`s10-restore-unauth` 복원 POST, `s11-unsigned-write` 수정 PUT)은 보내지 않고 `not_run`입니다.
+  - 규칙 점검 6건(`/api/checks?case=…`)은 학생 판정기·학생 탐지 규칙·정책 사본 검증을 가상 입력으로 실행해 `jsonReady`·`blocked`·출처(`source`)를 돌려주고, `engine: 'ALEPH SDP 엔진'`, `engineEnforced: 'not_run'`(엔진이 실제로 집행했는지는 미실행)을 붙입니다.
+  - 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.
+- 확인: `node --test test/ops.test.mjs test/checks.test.mjs`(요약이 서버 값만 씀·비로그인 401·화면이 /api/checks를 그대로 그림, 점검이 GET만·24건 이하·쓰기는 not_run, 제출 묶음과 /api/checks 결과가 같음, 규칙 점검 출처·엔진 표시).
 
 ### 제출 묶음 자기 점검의 제한 (심판 `S12_BUNDLE_UNSUPPORTED` 뒤 수정)
 
 - 심판은 `npm run bundle`을 격리 환경에서 실행하며, 그 환경에서는 `node:fs`·`node:path`·`node:url`·`node:child_process`(git 읽기)·`node:crypto`만 쓰고 공개 HTTPS 주소에 **GET·HEAD**만 보낼 수 있습니다.
-- 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 실제 결과는 작전실 실측표(`/ops.html`)와 로컬 시험으로 확인합니다.
+- 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 결과는 로컬 시험으로만 확인했습니다(실제 요청은 미실행).
 - 9단계 탐지 점검은 `node:util`을 쓰는 `scripts/detect-test.mjs`를 불러오지 않고 같은 6개 사례를 직접 만들어 확인합니다.
-- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 점검마다 GET 요청을 **한 번씩만** 보내고 그 요청에 attackId를 헤더 `X-Aleph-Attack-Id`·`X-Attack-Id`·`X-Aleph-Attack`와, 우리 앱 주소에는 쿼리 `?attackId=`로 붙입니다(심판의 짝짓기 방식이 문서에 없어 여러 곳에 붙임, 서버는 이 값을 쓰지 않음). `observed`에는 실제로 보낸 메서드·전체 주소와 서버가 돌려준 상태·오류 코드만 적습니다. 요청을 보내지 않은 점검은 모두 `not_run`이고, 요청이 아닌 로컬 시험(탐지·판정기 연습)은 제출 묶음에서 뺐습니다.
+- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 `src/checks.mjs`의 점검 목록·실행 함수를 `GET /api/checks`와 함께 씁니다. 점검마다 GET 요청을 한 번씩만 보내고 `observed`에는 상태 같은 사실만 적으며, 요청을 보내지 않은 점검은 `not_run`입니다.
 
 ### 출처: 제공 엔진·시작 틀과 학생 작업
 
@@ -326,13 +326,13 @@
 | 학생 판정기 `src/decider.mjs` | 설치 없음(엔진이 `decide(request)`를 부름) | 로컬 연습: `npm run decider:test`, `npm run fixture:7`, `node --test test/zone.test.mjs test/step7.test.mjs` | 엔진 쪽에서 판정기 호출을 멈춥니다(학생이 직접 멈출 수 없음). 판정기는 응답이 없거나 틀리면 엔진이 허용하지 않습니다. | `git log -- src/decider.mjs`로 정상 커밋을 찾아 그 파일만 되돌린 뒤 커밋·push |
 | 탐지 규칙 `src/detect.mjs` | 설치 없음 | 로컬 연습: `npm run detect:test`, `node --test test/detect.test.mjs` | 엔진 쪽 사건 전달을 멈춥니다. | 정상 커밋의 파일로 되돌림 |
 | 정책 복원 | `backup/policy-safe.json`·`.sha256` (커밋에 포함) | `npm run policy:diff` (미리 보기) | `--yes` 없이 실행하면 아무것도 바꾸지 않습니다. | `npm run policy:restore -- --apply --yes` (notes 서비스만, 감사 로그 추가) |
-| 탈환 작전실 | 위 자료실 배포에 포함 | `/ops.html` → 「지금 실측」 → 「결과 JSON 받기」 | 화면을 닫으면 끝(서버에 남는 상태 없음) | — |
+| 탈환 작전실 | 위 자료실 배포에 포함 | `/ops.html` → 점검 결과(`GET /api/checks`) → 「결과 JSON 받기」 | 화면을 닫으면 끝(서버에 남는 상태 없음) | — |
 | 제출 묶음 | `npm install` | `npm run bundle` (공개 키 점검까지 하려면 그 셸에만 `ALEPH_PUBLIC_DATA_API_KEY` 환경변수를 넣음, 값은 저장하지 않음) | — | — |
 
 ### 재현 순서
 
 1. `git clone` 후 `npm install`.
-2. 로컬 시험: `npm run decider:test` · `npm run fixture:7` · `npm run detect:test` · `npm run policy:diff` · `node --test test/owner.test.mjs test/zone.test.mjs test/step7.test.mjs test/detect.test.mjs test/restore.test.mjs test/device.test.mjs test/auth.test.mjs test/ops.test.mjs`
-3. 배포 주소에서 로그인 → `/ops.html` 「지금 실측」 → 결과 JSON을 받아 둡니다.
+2. 로컬 시험: `npm run decider:test` · `npm run fixture:7` · `npm run detect:test` · `npm run policy:diff` · `node --test test/owner.test.mjs test/zone.test.mjs test/step7.test.mjs test/detect.test.mjs test/restore.test.mjs test/device.test.mjs test/auth.test.mjs test/ops.test.mjs test/checks.test.mjs`
+3. 배포 주소의 `/ops.html`에서 점검 결과(`/api/checks`)를 확인하고 결과 JSON을 받아 둡니다.
 4. `npm run bundle` → `artifacts/submission.json`의 자기 점검을 확인합니다.
 5. 실행하지 않은 시험은 미실행으로 둡니다. 심판의 41종 판정은 포털에서 확인합니다.

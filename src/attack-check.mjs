@@ -310,71 +310,10 @@ async function runStep11Checks(config) {
   return base.slice(-20);
 }
 
-// 12단계: 점검마다 공개 HTTPS 주소에 GET 요청을 한 번씩만 보내고, 그 요청에 X-Aleph-Attack-Id 헤더로 attackId를 붙입니다.
-// observed에는 실제로 보낸 메서드·전체 주소와 서버가 돌려준 상태·오류 코드만 적습니다.
-// 요청을 보내지 않은 점검(쓰기 요청이 필요하거나 로그인·기기 패스키가 필요한 것)은 observed를 not_run으로 둡니다.
-// 로컬 시험(가짜 DB·가상 요청)은 요청이 아니므로 이 묶음에 넣지 않고 README·작전실에서 따로 보여 줍니다.
-const FORGED_BEARER = 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged';
-// 심판이 요청 기록과 attackId를 짝짓는 이름이 문서에 없어, 흔한 이름 여러 곳에 같은 attackId를 붙입니다.
-// 우리 앱 주소에는 ?attackId= 도 붙입니다(서버는 이 값을 쓰지 않음). 외부 원본 주소에는 쿼리를 붙이지 않습니다.
-async function sendGet(attackId, url, headers = {}, { query = true } = {}) {
-  const target = new URL(url);
-  if (query) target.searchParams.set('attackId', attackId);
-  try {
-    const response = await fetch(target.href, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
-      headers: { 'X-Aleph-Attack-Id': attackId, 'X-Attack-Id': attackId, 'X-Aleph-Attack': attackId, ...headers } });
-    const text = await response.text();
-    let body = null;
-    try { body = JSON.parse(text); } catch { /* JSON 아님 */ }
-    return { status: response.status, body, text };
-  } catch {
-    return null;
-  }
-}
-
+// 12단계: 서버 GET /api/checks·작전실 화면과 같은 목록·같은 함수(src/checks.mjs)로 점검합니다.
+// GET만 보내고 점검 하나에 요청 한 건, 쓰기 요청이 필요한 점검은 not_run. observed에는 "HTTP 401" 같은 사실만 적습니다.
 async function runStep12Checks(config) {
-  const app = appUrl(config);
-  const at = (path) => new URL(path, app).href;
-  const id = '00000000-0000-4000-8000-000000000001';
-  const gets = [
-    { attackId: 'deployment_identity_present', url: at('/aleph.json'), expected: 'GET /aleph.json 200, step 12 배포 식별 정보', show: (r) => `step ${r.body?.step ?? '없음'}` },
-    { attackId: 'public_data_json_removed', url: at('/data.json'), expected: 'GET /data.json 404 (공개 메모 파일 없음)' },
-    { attackId: 'anonymous_list_notes', url: at('/api/notes'), expected: '로그인 없는 메모 목록 GET은 401' },
-    { attackId: 'forged_token_list_notes', url: at('/api/notes'), headers: { Authorization: FORGED_BEARER }, expected: '가짜 토큰 메모 목록 GET은 401' },
-    { attackId: 'anonymous_read_note', url: at(`/api/notes/${id}`), expected: '로그인 없는 메모 한 건 GET은 401' },
-    { attackId: 'anonymous_list_notices', url: at('/api/notices'), expected: '로그인 없는 공지 목록 GET은 401' },
-    { attackId: 'forged_device_cookie', url: at('/api/notes'), headers: { Cookie: '__Host-vault_device=eyJ1IjoieCJ9.forged', Authorization: FORGED_BEARER }, expected: '가짜 기기 쿠키·가짜 토큰 메모 GET은 401/403' },
-    { attackId: 'anonymous_device_status', url: at('/api/device/status'), expected: '로그인 없는 기기 상태 GET은 401' },
-    { attackId: 'anonymous_auth_me', url: at('/api/auth/me'), expected: '로그인 없는 내 정보 GET은 401' },
-    { attackId: 'app_manifest_present', url: at('/manifest.webmanifest'), expected: 'GET /manifest.webmanifest 200, 접속 앱 설정', show: (r) => `이름 ${r.body?.short_name ?? '없음'}` },
-    { attackId: 'anonymous_ops_summary', url: at('/api/ops/summary'), expected: '로그인 없는 작전실 요약 GET은 401' },
-    { attackId: 'ops_page_present', url: at('/ops.html'), expected: 'GET /ops.html 200, 키 값 없음', show: (r) => `키 값 ${/sb_publishable_|sb_secret_/u.test(r.text) ? '있음' : '없음'}` },
-  ];
-  if (typeof config.originalApiUrl === 'string') {
-    const key = config.publicDataApiKey ?? process.env.ALEPH_PUBLIC_DATA_API_KEY;
-    gets.push({ attackId: 'original_api_direct_read', url: config.originalApiUrl, headers: key ? { apikey: key } : {},
-      expected: '원본 자료 주소 직접 GET은 메모 없이 401/403', show: () => (key ? '공개 키 붙임' : '키 없이 보냄') });
-  }
-  const results = [];
-  for (const item of gets) {
-    const sameApp = new URL(item.url).origin === app.origin;
-    const sent = sameApp ? `${item.url}${item.url.includes('?') ? '&' : '?'}attackId=${item.attackId}` : item.url;
-    const r = await sendGet(item.attackId, item.url, item.headers, { query: sameApp });
-    const observed = !r ? 'not_run'
-      : `GET ${sent} → HTTP ${r.status}`
-        + (Array.isArray(r.body) ? ` · 배열 ${r.body.length}건` : r.body?.error || r.body?.code ? ` · ${r.body.error ?? r.body.code}` : '')
-        + (item.show ? ` · ${item.show(r)}` : '');
-    results.push({ attackId: item.attackId, expected: item.expected, observed: observed.slice(0, 300) });
-  }
-  const notRun = [
-    ['anonymous_create_note', '로그인 없는 메모 추가(POST)는 401 — 쓰기 요청이라 보내지 않음'],
-    ['anonymous_delete_note', '로그인 없는 메모 삭제(DELETE)는 401 — 쓰기 요청이라 보내지 않음'],
-    ['forged_role_notice_update', '가짜 토큰·본문 role 공지 수정(PUT)은 401 — 쓰기 요청이라 보내지 않음'],
-    ['anonymous_restore', '로그인 없는 복원(POST)은 401 — 쓰기 요청이라 보내지 않음'],
-    ['cross_owner_note_access', 'B 토큰으로 A 메모는 404 — 로그인 토큰이 필요해 보내지 않음'],
-    ['approved_device_opens_vault', '승인 기기 확인 뒤 기존 화면 정상 — 로그인·패스키가 필요해 보내지 않음'],
-    ['ops_live_matrix', '로그인한 브라우저의 작전실 실측표 — 로그인 쿠키가 필요해 보내지 않음'],
-  ];
-  for (const [attackId, expected] of notRun) results.push({ attackId, expected, observed: 'not_run' });
-  return results.slice(0, 20);
+  const { runChecks } = await import('./checks.mjs');
+  const summary = await runChecks({ appUrl: appUrl(config).href, originalApiUrl: config.originalApiUrl });
+  return summary.attempts.map(({ attackId, expected, observed }) => ({ attackId, expected, observed }));
 }
