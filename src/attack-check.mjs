@@ -9,6 +9,7 @@ export async function runAttackChecks(config) {
   if (config.step === 7) return runStep7Checks(config);
   if (config.step === 8) return runStep8Checks(config);
   if (config.step === 9) return runStep9Checks(config);
+  if (config.step === 10) return runStep10Checks(config);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -243,4 +244,23 @@ async function runStep9Checks(config) {
   base.push({ attackId: 'revocation_enforced', expected: '회수 제안 뒤 해당 접속이 회수되고 정상 기기는 유지',
     observed: '미실행: 회수 집행과 경과 시간은 심판·운영 엔진이 확인하며 bundle에서 보내지 않음' });
   return base;
+}
+
+// 10단계: 9단계 점검을 이어 쓰고, 복원 경로를 로그인 없이·가짜 토큰으로 불러 거부되는지 봅니다.
+// B 토큰으로 하는 실제 한 건 복원과 정책 되돌리기 실행은 bundle에서 하지 않으므로 미실행으로 남깁니다.
+async function runStep10Checks(config) {
+  const base = (await runStep9Checks(config)).filter((item) => item.attackId !== 'deployment_identity_present');
+  const app = appUrl(config);
+  const identity = await anonymousGet(app, '/aleph.json');
+  base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 10 배포 식별 정보가 있음',
+    observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
+  const target = '/api/restore/00000000-0000-4000-8000-000000000000';
+  const anon = await anonymousGet(app, target, { method: 'POST' });
+  const forged = await anonymousGet(app, target, { method: 'POST', headers: { Authorization: 'Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ4In0.forged' } });
+  const show = (label, r) => unreached(r) ?? `${label} HTTP ${r.status} · 오류 ${r.body?.error ?? 'JSON 아님'}`;
+  base.push({ attackId: 'anonymous_restore', expected: '로그인 없는 복원 요청은 401', observed: show('비로그인 POST /api/restore/:id', anon) });
+  base.push({ attackId: 'forged_token_restore', expected: '가짜 토큰 복원 요청은 401', observed: show('가짜 토큰 POST /api/restore/:id', forged) });
+  base.push({ attackId: 'restore_one_note_b', expected: 'B 메모 한 건 복원 뒤 id·소유자·내용 해시가 사본과 같음',
+    observed: '미실행: B 로그인 토큰이 필요해 bundle에서 보내지 않음. test/restore.test.mjs 로컬 시험(가짜 DB)에서만 확인' });
+  return base.slice(-20);
 }

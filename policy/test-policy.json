@@ -1,0 +1,52 @@
+{
+  "schema": "aleph.policy.v1",
+  "version": "step9-fdf4960",
+  "services": {
+    "notes": {
+      "decider": {
+        "ruleIds": [
+          "device_registered",
+          "step_up_required",
+          "zone_route_allowlist",
+          "zone_own_notes",
+          "zone_notice_write"
+        ],
+        "zoneRoutes": [
+          "POST /notes",
+          "GET /notes/:id",
+          "PUT /notes/:id",
+          "DELETE /notes/:id",
+          "PUT /notices/:id"
+        ],
+        "denyNoticeWrite": true,
+        "denyNoteList": true
+      },
+      "api": {
+        "noteOwnerCheck": true,
+        "noticeWriteInstructorOnly": true,
+        "ignoreBodyRole": true
+      },
+      "allowedRoutes": [
+        "GET /api/notes",
+        "POST /api/notes",
+        "GET /api/notes/:id",
+        "PUT /api/notes/:id",
+        "DELETE /api/notes/:id",
+        "GET /api/notices",
+        "GET /api/notices/:id",
+        "PUT /api/notices/:id"
+      ]
+    },
+    "ai": {
+      "note": "다른 서비스 규칙 예시. 복원 도구는 notes 서비스만 바꾸고 이 항목은 보존합니다.",
+      "allowedRoutes": [
+        "POST /api/ai"
+      ]
+    },
+    "threat-intel": {
+      "allowedRoutes": [
+        "GET /api/threat-intel"
+      ]
+    }
+  }
+}

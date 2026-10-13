@@ -35,7 +35,8 @@
 - **6단계 「등록한 기기만 자료실에 들어옵니다」:** 커밋 `d6ca34b`(6단계 저장점). 판정기 `device_registered` 규칙.
 - **7단계 「평소와 다른 접속은 다시 확인합니다」:** 커밋 `0cf4ba9`(7단계 저장점). 입력 검사와 `step_up_required` 규칙.
 - **8단계 「자료마다 갈 수 있는 구역을 나눕니다」:** 커밋 `9f1bfd7`(8단계 저장점)과 판정기 수정 `d33a901`·`6646f68`·`535cd3e`. 마지막 `535cd3e`에서 판정기는 공지 읽기·메모 전체 목록을 거부하고, 메모 한 건 주인 비교는 API에 맡깁니다.
-- **9단계 「도플갱어를 찾고 권한을 거둡니다」:** 「9단계 저장점」 커밋. 아래 「9단계」 절이 현재 상태입니다.
+- **9단계 「도플갱어를 찾고 권한을 거둡니다」:** 커밋 `fdf4960`(9단계 저장점). 탐지 규칙 `burst_read`.
+- **10단계 「백업에서 자료실을 되살립니다」:** 「10단계 저장점」 커밋. 아래 「10단계」 절이 현재 상태입니다.
 
 ## 2단계에서 만든 것 (3단계에도 유지)
 
@@ -196,7 +197,7 @@
 
 이 시험들은 가상 요청과 가짜 DB로 하는 로컬 연습이며 심판 판정이 아닙니다.
 
-## 9단계: 현재 작동하는 기능
+## 9단계에서 만든 것 (10단계에도 유지)
 
 - **탐지 함수** (`src/detect.mjs`, 계약 `docs/DETECT_EVENTS.md`)
   - **입력 정리 `readEvents`:** 사건에서 시각(`at`), 요청 종류(`method`), 가명 사용자(`identity.sub`)만 읽습니다. 메모 내용·토큰·실명 같은 다른 값은 버리고, 사건을 저장하거나 출력하지 않습니다. 형식이 틀린 사건과 `GET`이 아닌 요청은 세지 않습니다.
@@ -212,3 +213,48 @@
 3. `npm run decider:test`와 `node --test test/zone.test.mjs`가 그대로 통과해 이전 판정 규칙이 유지되는지 봅니다.
 
 이 시험들은 가상 사건으로 하는 로컬 연습이며, 실제 접속 회수나 심판 판정이 아닙니다.
+
+## 10단계: 현재 작동하는 기능
+
+### 1. 안전 정책 사본과 시험 정책 비교·되돌리기
+
+- **검증한 사본:** `backup/policy-safe.json`(버전 `step9-fdf4960`)은 침해 전 `notes` 서비스의 안전 정책입니다(판정기 규칙·허용 경로, API 소유자 검사·강사 전용 공지 수정·본문 role 무시, `allowedRoutes`). 봉인 해시는 `backup/policy-safe.sha256`에 있습니다.
+- **시험 정책:** `policy/test-policy.json`. 실제 운영 정책(`src/decider.mjs`, `src/notes-api.mjs`, DB 권한)은 이 도구가 바꾸지 않습니다.
+- **차이 보기:** `npm run policy:diff`
+  - 사본이 없거나(`SNAPSHOT_MISSING`), 해시가 틀리거나(`SNAPSHOT_HASH_MISMATCH`), 사본이 지금 판정기의 `RULE_IDS`·허용 경로와 다르면 즉시 중단합니다.
+  - 통과하면 복원할 버전과 바뀔 항목(`notes.…` 경로, 지금 값 → 복원값)만 보여 주고 아무것도 바꾸지 않습니다.
+- **되돌리기:** `npm run policy:restore -- --apply --yes`
+  - `--yes`가 없으면 중단합니다. 실행하면 `services.notes`만 사본 버전으로 바꾸고, 다른 서비스(`ai`, `threat-intel`) 규칙은 그대로 둡니다.
+  - 실행할 때마다 `backup/audit.log` 끝에 한 줄(시각·버전·사본 해시·바뀐 항목)을 덧붙입니다. 이전 줄은 지우거나 고치지 않습니다.
+- 봉인은 실수나 부분 변조를 잡는 무결성 검사입니다. 사본과 봉인을 함께 바꾸는 공격자까지 막지는 못하므로, 사본은 Git 기록(커밋 해시)으로도 대조합니다.
+
+### 2. 메모 한 건 복원: `POST /api/restore/:id`
+
+- **서비스·경로:** `notes` 서비스, `POST /api/restore/:id` (`api/restore/[id].js` → `src/notes-api.mjs`의 `handleRestore`). `aleph.config.json`의 `restoreRoute`와 `allowedRoutes`에 적었습니다. 판정기에는 이 경로를 열지 않았습니다(알 수 없는 경로로 거부).
+- **동작:** 로그인한 사용자가 자기 메모 한 건만 비공개 백업 사본(`vault_notes_backup`)에서 되살립니다.
+  1. 사본을 읽어 `owner_id`가 검증된 사용자와 같은지 봅니다. 남의 사본과 없는 사본은 `404`입니다.
+  2. 사본 내용의 SHA-256(`title` + 줄바꿈 + `body`)이 기록된 `content_sha256`과 같은지 다시 계산합니다. 틀리면 `409 BACKUP_HASH_MISMATCH`이고 쓰지 않습니다.
+  3. 같은 id가 다른 소유자 메모면 `409 OWNER_CONFLICT`이고 덮어쓰지 않습니다.
+  4. 그 한 건만 쓰고 다시 읽어 id·소유자·해시가 사본과 같은지 확인한 뒤 `200 {id, restored:true, ownerMatch:true, contentSha256}`을 돌려줍니다. 응답에 메모 내용은 없습니다.
+  5. 결과는 `vault_audit`에 한 줄 추가합니다. 이 표는 서버 함수도 추가·읽기만 가능하고 고치거나 지울 수 없습니다.
+- **DB SQL (제안, 학생이 검토 후 실행):** `supabase/step10-backup.sql`이 `vault_notes_backup`·`vault_audit`를 만들고 RLS·권한 회수를 한 뒤, **시험 계정 B의 메모만** 사본으로 떠 둡니다(`B계정@이메일`만 바꿔서 실행).
+- **B로 확인하는 방법:** B로 로그인한 화면의 개발자 도구 콘솔에서 B 메모 id로 `fetch('/api/restore/<B 메모 id>', {method:'POST', headers:{Authorization:'Bearer <B 토큰>'}})`를 보냅니다. `200`과 `contentSha256`이 나오고, SQL Editor에서 같은 id의 사본 해시와 같아야 합니다.
+
+### 3. 복구 뒤 1~9단계 재시험 순서
+
+아래 결과 칸은 **실제로 실행한 것만** 채웁니다. 실행하지 않은 시험은 미실행으로 둡니다.
+
+| 순서 | 단계 | 정상 요청 (유지돼야 함) | 금지 요청 (거부돼야 함) | 방법 | 결과 |
+|---|---|---|---|---|---|
+| 1 | 정책 | `npm run policy:diff` → 바뀔 항목 없음 | 사본 해시 틀림 → 중단 | 터미널, `node --test test/restore.test.mjs` | 미실행 |
+| 2 | 1·2단계 공개 자료 | — | 시크릿 창 `/data.json` 404, 페이지 소스에 메모 없음 | 브라우저 | 미실행 |
+| 3 | 3단계 로그인 | A 로그인 후 목록 `200` | 비로그인·가짜 토큰 `/api/notes` `401` | `npm run bundle` 자기 점검 | 미실행 |
+| 4 | 4단계 소유자 | A가 자기 메모 읽기·수정 `200` | B가 A 메모 `GET·PUT·DELETE` `404` | 브라우저 콘솔(B 토큰), `node --test test/owner.test.mjs` | 미실행 |
+| 5 | 5단계 원본 주소 | 화면에서 A 메모 CRUD | 공개 키·로그인 토큰으로 원본 주소 직접 읽기 `401/403` | `npm run bundle` 자기 점검 | 미실행 |
+| 6 | 6단계 기기 | 등록 기기 `allow` | 미등록 기기 `deny`·`device_not_registered` | `npm run decider:test` | 미실행 |
+| 7 | 7단계 재확인 | 정상 사건 `allow`, 재확인 뒤 `allow` | 복합 이상 `step_up` | `npm run fixture:7`, `node --test test/step7.test.mjs` | 미실행 |
+| 8 | 8단계 구역 | 자기 메모 한 건 `allow` | 메모 전체 목록·공지 수정 `deny`, 학생 공지 수정 `403` | `node --test test/zone.test.mjs`, 브라우저 콘솔 | 미실행 |
+| 9 | 9단계 탐지 | 정상 사건 `observe` | 10분 121건 이상 `propose_revocation` | `npm run detect:test` | 미실행 |
+| 10 | 10단계 복원 | B 메모 한 건 복원 `200`, 해시 같음 | A가 B 사본 복원 `404`, 비로그인 `401` | B 콘솔, `npm run bundle` | 미실행 |
+
+로컬 시험(`node --test`, `npm run …:test`)은 가상 요청·가짜 DB 연습이며 심판 판정이 아닙니다.

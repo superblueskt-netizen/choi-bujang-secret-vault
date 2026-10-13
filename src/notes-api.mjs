@@ -2,7 +2,7 @@
 // 4단계: 읽기·추가·수정·삭제 모두 확인된 사용자 ID와 DB의 owner_id를 비교하고, 맞지 않으면 기본 거부합니다.
 // URL·본문의 owner_id·userId·role은 소유자 판단에 쓰지 않습니다.
 // 8단계: 자원마다 구역 ID(note:<id>, notice:<id>)를 붙이고, 공지 수정은 DB의 강사 목록(vault_instructors)으로만 허용합니다.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from './verify-login.mjs';
@@ -217,4 +217,63 @@ export async function handleNoticeItem(request, response, rawId) {
   const { data, error } = await ctx.db.from(NOTICE_TABLE).select(COLUMNS).eq('id', id).maybeSingle();
   if (error) return dbFailure(response, '공지 읽기', error);
   return data ? send(response, 200, publicNote(data)) : notFound(response);
+}
+
+// ===== 10단계: 비공개 백업에서 메모 한 건 복원 =====
+// POST /api/restore/:id — 로그인한 사용자가 자기 메모 한 건만 백업 사본(vault_notes_backup)에서 되살립니다.
+// 백업 행의 id·owner_id·내용 해시(title + "\n" + body의 SHA-256)를 대조하고, 맞을 때만 그 한 건을 씁니다.
+// 다른 메모는 건드리지 않고, 결과는 vault_audit에 한 줄 추가합니다(지우거나 고치지 않음). 응답·로그에 메모 내용은 넣지 않습니다.
+const BACKUP_TABLE = 'vault_notes_backup';
+const AUDIT_TABLE = 'vault_audit';
+export const contentSha256 = (title, body) => createHash('sha256').update(`${title}\n${body ?? ''}`, 'utf8').digest('hex');
+
+async function audit(ctx, resource, result) {
+  const { error } = await ctx.db.from(AUDIT_TABLE).insert({ action: 'note_restore', resource, actor: ctx.userId, result });
+  if (error) console.error('restore: 감사 기록 실패', error?.code ?? 'no-code');
+}
+
+export async function handleRestore(request, response, rawId) {
+  if (request.method !== 'POST') {
+    response.setHeader('Allow', 'POST');
+    return send(response, 405, { error: 'METHOD_NOT_ALLOWED' });
+  }
+  const ctx = await authenticate(request, response);
+  if (!ctx) return;
+  const id = typeof rawId === 'string' && UUID.test(rawId) ? rawId.toLowerCase() : null;
+  if (!id) return notFound(response);
+  const resource = resourceId('note', id);
+  markResource(response, 'note', id);
+
+  // 1) 백업 사본을 읽고 소유자를 대조합니다. 남의 백업과 없는 백업은 똑같이 404입니다.
+  const { data: copy, error: copyError } = await ctx.db.from(BACKUP_TABLE)
+    .select('id, owner_id, title, body, content_sha256').eq('id', id).maybeSingle();
+  if (copyError) return dbFailure(response, '백업 읽기', copyError);
+  if (!copy || copy.owner_id !== ctx.userId) { logDeny('backup_owner_mismatch', resource); return notFound(response); }
+  // 2) 백업 내용이 기록된 해시와 같은지 다시 읽어 검증합니다.
+  if (contentSha256(copy.title, copy.body) !== copy.content_sha256) {
+    await audit(ctx, resource, 'backup_hash_mismatch');
+    return send(response, 409, { error: 'BACKUP_HASH_MISMATCH', message: '백업 사본이 검증되지 않아 복원하지 않았습니다.' });
+  }
+  // 3) 같은 id가 이미 다른 사람 소유면 덮어쓰지 않습니다.
+  const { data: live, error: liveError } = await ctx.db.from(TABLE).select('id, owner_id').eq('id', id).maybeSingle();
+  if (liveError) return dbFailure(response, '현재 메모 읽기', liveError);
+  if (live && live.owner_id !== ctx.userId) {
+    await audit(ctx, resource, 'owner_conflict');
+    return send(response, 409, { error: 'OWNER_CONFLICT', message: '같은 id의 다른 소유자 메모가 있어 복원하지 않았습니다.' });
+  }
+  // 4) 그 한 건만 씁니다.
+  const values = { title: copy.title, body: copy.body ?? '' };
+  const { error: writeError } = live
+    ? await ctx.db.from(TABLE).update(values).eq('id', id).eq('owner_id', ctx.userId)
+    : await ctx.db.from(TABLE).insert({ id, owner_id: ctx.userId, ...values });
+  if (writeError) return dbFailure(response, '복원 쓰기', writeError);
+  // 5) 다시 읽어 id·소유자·해시가 사본과 같은지 확인합니다.
+  const { data: after, error: afterError } = await ctx.db.from(TABLE)
+    .select('id, owner_id, title, body').eq('id', id).maybeSingle();
+  if (afterError) return dbFailure(response, '복원 확인', afterError);
+  const verified = Boolean(after) && after.id === copy.id && after.owner_id === copy.owner_id
+    && contentSha256(after.title, after.body) === copy.content_sha256;
+  await audit(ctx, resource, verified ? 'restored' : 'verify_failed');
+  if (!verified) return send(response, 500, { error: 'RESTORE_VERIFY_FAILED' });
+  return send(response, 200, { id, restored: true, ownerMatch: true, contentSha256: copy.content_sha256 });
 }

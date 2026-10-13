@@ -61,6 +61,9 @@ const ZONES = Object.freeze({
   'DELETE /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'PUT /notices/:id': { zone: 'notice_write', rule: 'zone_notice_write', path: `/notices/${ID_SEGMENT}` },
 });
+// 10단계 정책 대조용: 판정기가 실제로 허용하는 경로 모양 목록(읽기 전용)
+export const ZONE_ROUTES = Object.freeze(Object.keys(ZONES));
+
 export function readZone(request) {
   const method = request?.method;
   const route = request?.route;
