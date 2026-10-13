@@ -65,7 +65,7 @@
       <div class="panel" id="device-gate">
         <h2>기기 승인</h2>
         <p class="status" id="device-status">기기 상태를 확인하는 중…</p>
-        <p class="muted">앱으로 설치했거나 이 화면의 버튼을 눌렀다고 승인되는 것이 아닙니다. 서버가 이 기기의 패스키 서명을 확인하고, 서버 DB에서 승인된 기기일 때만 자료가 열립니다. 기기 키는 기기 안(패스키)에만 있고 브라우저 저장소에 넣지 않습니다.</p>
+        <p class="muted">앱으로 설치했거나 이 화면의 버튼을 눌렀다고 승인되는 것이 아닙니다. 서버가 이 기기의 패스키 서명을 확인하고, 서버 DB에서 승인된 기기일 때만 자료가 열립니다. 패스키의 비밀 부분은 기기 밖으로 나오지 않고, 이 화면은 어떤 값도 브라우저에 저장하지 않습니다.</p>
         <div class="actions">
           <button type="button" id="device-verify">이 기기로 확인</button>
           <button type="button" class="ghost" id="device-register">이 기기 승인 요청</button>
@@ -91,32 +91,21 @@
   </main>
 
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
-
-    // 공개용 값만 둡니다(서버 전용 키 없음).
-    const SUPABASE_URL = 'https://giixryoqzyamfedhnnpt.supabase.co';
-    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_DJ4O37tcMRnxkkUQWaKyvQ_rvq9urx6';
-    const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    // 11단계: 화면에는 키·토큰을 두지 않습니다. 로그인은 서버(/api/auth/login)가 처리하고,
+    // 로그인·기기 세션은 HttpOnly 쿠키로만 오가며 브라우저 저장소에는 아무것도 저장하지 않습니다.
+    let currentUser = null;
 
     const $ = (id) => document.getElementById(id);
-    const loginReasons = {
-      invalid_credentials: '이메일 또는 비밀번호가 맞지 않습니다.',
-      email_not_confirmed: '이메일 인증이 끝나지 않은 계정입니다.',
-      over_request_rate_limit: '시도가 너무 많습니다. 잠시 뒤 다시 시도하세요.',
-      user_banned: '사용이 정지된 계정입니다.',
-    };
-
     async function api(path, options = {}) {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
       const response = await fetch(path, {
-        ...options, cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        ...options, cache: 'no-store', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
       });
       const body = await response.json().catch(() => null);
       if (response.status === 403 && body?.error === 'DEVICE_NOT_APPROVED' && !path.startsWith('/api/device/')) {
         lockVault(); refreshDevice();
       }
+      if (response.status === 401 && body?.error === 'LOGIN_REQUIRED' && !path.startsWith('/api/auth/')) render(null);
       if (!response.ok) { const e = new Error(body?.message || body?.error || `요청 실패 (HTTP ${response.status})`); e.code = body?.error; throw e; }
       return body;
     }
@@ -154,12 +143,12 @@
 
     async function requestDevice() {
       if (!window.PublicKeyCredential) throw new Error('이 브라우저는 패스키를 지원하지 않습니다.');
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user;
+      const user = currentUser;
+      if (!user?.userId) throw new Error('먼저 로그인하세요.');
       const ch = await api('/api/device/challenge', { method: 'POST', body: JSON.stringify({ purpose: 'register' }) });
       const cred = await navigator.credentials.create({ publicKey: {
         challenge: fromB64u(ch.challenge), rp: { id: ch.rpId, name: 'BYTE BACK 자료실' },
-        user: { id: new TextEncoder().encode(user.id), name: user.email, displayName: user.email },
+        user: { id: new TextEncoder().encode(user.userId), name: user.email ?? 'vault-user', displayName: user.email ?? 'vault-user' },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
         authenticatorSelection: { userVerification: 'preferred', residentKey: 'discouraged' },
         attestation: 'none', timeout: ch.timeoutMs,
@@ -247,12 +236,13 @@
       }
     }
 
-    function render(session) {
-      const signedIn = Boolean(session);
+    function render(user) {
+      currentUser = user;
+      const signedIn = Boolean(user);
       $('signed-out').hidden = signedIn;
       $('signed-in').hidden = !signedIn;
       if (signedIn) {
-        $('who').textContent = `${session.user.email} 로그인됨`;
+        $('who').textContent = `${user.email ?? '내 계정'} 로그인됨`;
         lockVault();
         refreshDevice();
       } else {
@@ -266,20 +256,19 @@
       event.preventDefault();
       const button = event.submitter; button.disabled = true;
       $('login-error').textContent = '';
-      const { error } = await supabase.auth.signInWithPassword({
-        email: $('email').value.trim(), password: $('password').value,
-      });
-      button.disabled = false;
-      if (error) {
-        $('login-error').textContent = `로그인 실패: ${loginReasons[error.code] ?? error.message}`;
-      } else {
+      try {
+        await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: $('email').value.trim(), password: $('password').value }) });
         $('password').value = '';
+        await loadMe();
+      } catch (error) {
+        $('login-error').textContent = `로그인 실패: ${error.message}`;
       }
+      button.disabled = false;
     });
 
     $('logout').addEventListener('click', async () => {
-      await fetch('/api/device/signout', { method: 'POST', cache: 'no-store' }).catch(() => {});
-      await supabase.auth.signOut();
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' }).catch(() => {});
+      render(null);
     });
 
     // 설치형 웹앱: 오프라인 안내만 담당하는 서비스 워커. 자료(API 응답)는 저장하지 않습니다.
@@ -293,8 +282,10 @@
       $('new-title').value = ''; $('new-body').value = '';
     });
 
-    // onAuthStateChange 콜백 안에서 바로 await 하지 않도록 다음 틱에 그립니다.
-    supabase.auth.onAuthStateChange((_event, session) => { setTimeout(() => render(session), 0); });
+    async function loadMe() {
+      try { render(await api('/api/auth/me')); } catch { render(null); }
+    }
+    loadMe();
   </script>
 </body>
 </html>

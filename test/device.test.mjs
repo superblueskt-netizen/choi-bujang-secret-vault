@@ -1,12 +1,12 @@
 // 11단계 로컬 시험: 진짜 ES256 키로 만든 가상 패스키와 가짜 DB를 씁니다. 실제 기기·배포·심판 판정이 아닙니다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { handleDevice, ORIGIN, RP_ID } from '../src/device-api.mjs';
 import { handleCollection, setServicesForTesting } from '../src/notes-api.mjs';
 import { readDeviceSession, signDeviceSession } from '../src/device-session.mjs';
 
-const SECRET = 'test-only-secret';
+const SECRET = randomBytes(32).toString('hex');   // 실행할 때마다 새로 만드는 시험용 값(저장하지 않음)
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const tables = { vault_devices: [], vault_device_challenges: [], vault_notes: [{ id: 'n1', owner_id: A, title: 'A 메모', body: 'a', created_at: 1 }] };
@@ -50,7 +50,7 @@ const clientData = (type, challenge, origin = ORIGIN) => Buffer.from(JSON.string
 
 // 가상 기기(패스키): 개인키는 이 시험 메모리 안에만 있습니다.
 const device = generateKeyPairSync('ec', { namedCurve: 'P-256' });
-const credId = b64u(Buffer.from('credential-A-1'));
+const credId = b64u(randomBytes(16));
 const spki = b64u(device.publicKey.export({ format: 'der', type: 'spki' }));
 
 async function registerA() {
@@ -70,7 +70,7 @@ async function verifyA(count, { who = 'a', origin } = {}) {
 test('기기 세션 쿠키: 서명·만료·변조 검사', () => {
   const value = signDeviceSession({ userId: A, deviceId: 'd1' }, SECRET);
   assert.deepEqual(readDeviceSession(`x=1; __Host-vault_device=${value}`, SECRET), { userId: A, deviceId: 'd1' });
-  assert.equal(readDeviceSession(`__Host-vault_device=${value}`, 'other-secret'), null);
+  assert.equal(readDeviceSession(`__Host-vault_device=${value}`, randomBytes(32).toString('hex')), null);
   assert.equal(readDeviceSession(`__Host-vault_device=${value.replace(/.$/u, (c) => (c === 'A' ? 'B' : 'A'))}`, SECRET), null);
   assert.equal(readDeviceSession(`__Host-vault_device=${value}`, SECRET, Date.now() + 16 * 60 * 1000), null);
 });

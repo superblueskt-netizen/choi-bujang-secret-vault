@@ -113,7 +113,8 @@ async function runStep4Checks(config) {
   checks.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 4 배포 식별 정보가 있음',
     observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
   const issuer = config.identityProvider?.issuer;
-  const anonKey = config.publicDataApiKey;
+  // 11단계부터 공개 키 값은 Git·설정에 두지 않습니다. 점검할 때만 환경변수 ALEPH_PUBLIC_DATA_API_KEY로 넣습니다.
+  const anonKey = config.publicDataApiKey ?? process.env.ALEPH_PUBLIC_DATA_API_KEY;
   if (typeof issuer === 'string' && typeof anonKey === 'string') {
     const restUrl = new URL('/rest/v1/vault_notes?select=id', new URL(issuer).origin);
     const direct = await anonymousGet(restUrl, '', { headers: { apikey: anonKey } });
@@ -134,8 +135,13 @@ async function runStep5Checks(config) {
   const identity = await anonymousGet(app, '/aleph.json');
   base.push({ attackId: 'deployment_identity_present', expected: '/aleph.json에 step 5 배포 식별 정보가 있음',
     observed: unreached(identity) ?? `비로그인 /aleph.json HTTP ${identity.status} · step ${identity.body?.step ?? '없음'}` });
-  if (typeof config.originalApiUrl === 'string' && typeof config.publicDataApiKey === 'string') {
-    const direct = await anonymousGet(new URL(config.originalApiUrl), '', { headers: { apikey: config.publicDataApiKey } });
+  const publicKey = config.publicDataApiKey ?? process.env.ALEPH_PUBLIC_DATA_API_KEY;
+  if (typeof config.originalApiUrl === 'string' && typeof publicKey !== 'string') {
+    base.push({ attackId: 'original_api_direct_read', expected: '공개 키로 원본 자료 주소를 직접 부르면 메모 없음(권한 오류)',
+      observed: '미실행: 공개 키 값을 Git·설정에 두지 않아 이번 묶음에서는 보내지 않음(환경변수 ALEPH_PUBLIC_DATA_API_KEY를 넣으면 실행)' });
+  }
+  if (typeof config.originalApiUrl === 'string' && typeof publicKey === 'string') {
+    const direct = await anonymousGet(new URL(config.originalApiUrl), '', { headers: { apikey: publicKey } });
     base.push({ attackId: 'original_api_direct_read', expected: '공개 키로 원본 자료 주소를 직접 부르면 메모 없음(권한 오류)',
       observed: unreached(direct) ?? `공개 키 GET originalApiUrl HTTP ${direct.status} · `
         + (Array.isArray(direct.body) ? `행 ${direct.body.length}개 노출` : `오류 ${direct.body?.code ?? direct.body?.message ?? '없음'}`) });

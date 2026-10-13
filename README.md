@@ -134,7 +134,7 @@
 
 ### 남은 점
 
-- 화면 코드에는 아직 Supabase 공개 키(`sb_publishable_…`)가 있습니다. 로그인까지 서버 함수로 옮기면 없앨 수 있지만, 로그인이 깨질 위험이 있어 이번에는 하지 않았습니다.
+- (11단계에서 해소) 화면 코드에 있던 Supabase 공개 키는 11단계에서 로그인을 서버 함수로 옮기며 화면과 `aleph.config.json`에서 뺐습니다. 이전 커밋 기록에는 남아 있습니다.
 
 ## 6단계에서 만든 것 (7단계에도 유지)
 
@@ -270,6 +270,13 @@
 - **자료 API 기기 확인:** 메모·공지·복원 API는 로그인 토큰 검사에 더해, 기기 세션 쿠키가 같은 사용자의 **지금 승인 상태인** 기기를 가리키는지 요청마다 DB로 확인합니다. 아니면 `403 DEVICE_NOT_APPROVED`이고 자료를 주지 않습니다. 승인을 거두면(`revoked`) 다음 요청부터 막힙니다. 기존 거부 결과(비로그인 `401`, 남의 메모 `404`, 학생 공지 수정 `403`)는 그대로입니다.
 - **화면:** 로그인 뒤에도 기기 확인 전에는 자료 영역을 숨기고 메모를 불러오지 않습니다. 서버의 `/api/device/status`가 `verified: true`일 때만 기존 자료실 화면을 엽니다.
 - **판정기:** 바꾸지 않았습니다(6단계 `device_registered` 규칙 유지).
+- **키·토큰을 화면과 브라우저 저장소에서 뺌 (심판 `S11_KEY_EXPOSED` 뒤 수정):**
+  - 로그인을 서버 함수 `POST /api/auth/login`(`src/auth-api.mjs`, `api/auth/[action].js`)으로 옮겼습니다. 서버가 Supabase Auth로 확인하고, 액세스 토큰은 `__Host-vault_session` HttpOnly·Secure·SameSite=Strict 쿠키로만 줍니다. 응답 본문·로그에는 토큰·비밀번호가 없습니다. `GET /api/auth/me`는 로그인 상태, `POST /api/auth/logout`은 로그인·기기 쿠키를 지웁니다.
+  - 화면(`public/index.html`)에서 Supabase SDK와 공개 키 값을 없앴고, 어떤 값도 브라우저 저장소(localStorage·sessionStorage·IndexedDB)에 넣지 않습니다. 자료 API는 `Authorization` 헤더가 없으면 로그인 쿠키의 토큰을 같은 검사기(`src/verify-login.mjs`)로 확인합니다.
+  - `aleph.config.json`의 `publicDataApiKey` 값을 지웠습니다. 원본 주소 직접 읽기 자기 점검은 환경변수 `ALEPH_PUBLIC_DATA_API_KEY`를 넣었을 때만 보내고, 없으면 미실행으로 남깁니다.
+  - 시험 파일의 고정 시험용 비밀 문자열을 실행할 때마다 무작위로 만드는 값으로 바꿨습니다.
+  - 이전 커밋 기록에는 공개 키 값이 남아 있습니다. 필요하면 Supabase API Keys에서 새 publishable 키로 바꾸고 옛 키를 끄면 됩니다(지금 앱은 publishable 키를 쓰지 않습니다).
+  - 확인: `node --test test/auth.test.mjs`(3개: 토큰은 쿠키로만, 쿠키로 자료 API 호출, 화면 묶음·설정에 키 값과 브라우저 저장소 사용 없음).
 - **DB SQL (제안, 학생이 검토 후 실행):** `supabase/step11-devices.sql` — `vault_devices`·`vault_device_challenges` 생성, RLS·권한 회수, 서버 함수는 등록(pending)·서명 횟수 갱신만 가능.
 
 ### 확인 순서

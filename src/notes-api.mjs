@@ -34,6 +34,18 @@ function getServices() {
 }
 
 const send = (response, status, body) => response.status(status).json(body);
+
+// 11단계: 화면은 토큰을 갖지 않고 HttpOnly 로그인 쿠키(__Host-vault_session)로 요청합니다.
+// Authorization 헤더가 있으면 그것을 쓰고(심판·시험용), 없을 때만 쿠키의 토큰을 같은 검사기로 확인합니다.
+function authorizationOf(request) {
+  const header = request.headers?.authorization;
+  if (typeof header === 'string' && header) return header;
+  const cookie = request.headers?.cookie;
+  if (typeof cookie !== 'string' || cookie.length > 8192) return undefined;
+  const raw = cookie.split(/;\s*/u).find((part) => part.startsWith('__Host-vault_session='));
+  const token = raw?.slice('__Host-vault_session='.length);
+  return token ? `Bearer ${token}` : undefined;
+}
 const notFound = (response) => send(response, 404, { error: 'NOT_FOUND' });
 
 // 8단계 자원 ID: 서버가 요청마다 구역을 구별하도록 응답 헤더에 붙입니다(응답 본문 모양은 그대로).
@@ -86,7 +98,7 @@ async function authenticate(request, response) {
     send(response, 500, { error: 'SERVER_NOT_CONFIGURED' });
     return null;
   }
-  const user = await svc.verify(request.headers?.authorization);
+  const user = await svc.verify(authorizationOf(request));
   if (!user?.userId) {
     send(response, 401, { error: 'LOGIN_REQUIRED', message: '로그인 토큰이 없거나 확인되지 않았습니다.' });
     return null;
@@ -118,7 +130,7 @@ export async function authenticateLoginOnly(request, response) {
     send(response, 500, { error: 'SERVER_NOT_CONFIGURED' });
     return null;
   }
-  const user = await svc.verify(request.headers?.authorization);
+  const user = await svc.verify(authorizationOf(request));
   if (!user?.userId) {
     send(response, 401, { error: 'LOGIN_REQUIRED', message: '로그인 토큰이 없거나 확인되지 않았습니다.' });
     return null;

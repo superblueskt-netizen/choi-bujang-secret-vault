@@ -26,6 +26,5 @@
     "POST /api/device/signout"
   ],
   "originalApiUrl": "https://giixryoqzyamfedhnnpt.supabase.co/rest/v1/vault_notes",
-  "restoreRoute": "POST /api/restore/:id",
-  "publicDataApiKey": "sb_publishable_DJ4O37tcMRnxkkUQWaKyvQ_rvq9urx6"
+  "restoreRoute": "POST /api/restore/:id"
 }
