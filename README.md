@@ -237,24 +237,24 @@
   3. 같은 id가 다른 소유자 메모면 `409 OWNER_CONFLICT`이고 덮어쓰지 않습니다.
   4. 그 한 건만 쓰고 다시 읽어 id·소유자·해시가 사본과 같은지 확인한 뒤 `200 {id, restored:true, ownerMatch:true, contentSha256}`을 돌려줍니다. 응답에 메모 내용은 없습니다.
   5. 결과는 `vault_audit`에 한 줄 추가합니다. 이 표는 서버 함수도 추가·읽기만 가능하고 고치거나 지울 수 없습니다.
-- **DB SQL (제안, 학생이 검토 후 실행):** `supabase/step10-backup.sql`이 `vault_notes_backup`·`vault_audit`를 만들고 RLS·권한 회수를 한 뒤, **시험 계정 B의 메모만** 사본으로 떠 둡니다(`B계정@이메일`만 바꿔서 실행).
+- **DB SQL (2026-10-13 실행함):** `supabase/step10-backup.sql`이 `vault_notes_backup`·`vault_audit`를 만들고 RLS·권한 회수를 한 뒤, **시험 계정 B의 메모만** 사본으로 떠 둡니다(`B계정@이메일`만 바꿔서 실행).
 - **B로 확인하는 방법:** B로 로그인한 화면의 개발자 도구 콘솔에서 B 메모 id로 `fetch('/api/restore/<B 메모 id>', {method:'POST', headers:{Authorization:'Bearer <B 토큰>'}})`를 보냅니다. `200`과 `contentSha256`이 나오고, SQL Editor에서 같은 id의 사본 해시와 같아야 합니다.
 
 ### 3. 복구 뒤 1~9단계 재시험 순서
 
-아래 결과 칸은 **실제로 실행한 것만** 채웁니다. 실행하지 않은 시험은 미실행으로 둡니다.
+아래 결과 칸은 **실제로 실행한 것만** 채웁니다. 실행하지 않은 시험은 미실행으로 둡니다. 「로컬」은 가상 요청·가짜 DB 연습이고, 「배포」는 실제 배포 주소에 보낸 요청입니다. 어느 것도 심판 판정은 아닙니다.
 
 | 순서 | 단계 | 정상 요청 (유지돼야 함) | 금지 요청 (거부돼야 함) | 방법 | 결과 |
 |---|---|---|---|---|---|
-| 1 | 정책 | `npm run policy:diff` → 바뀔 항목 없음 | 사본 해시 틀림 → 중단 | 터미널, `node --test test/restore.test.mjs` | 미실행 |
+| 1 | 정책 | `npm run policy:diff` → 바뀔 항목 없음 | 사본 해시 틀림 → 중단 | 터미널, `node --test test/restore.test.mjs` | 실행(2026-10-13, 로컬): `policy:diff` 바뀔 항목 없음·사본 검증 통과, `test/restore.test.mjs` 5개 통과(변조 감지·해시 틀림 중단 포함) |
 | 2 | 1·2단계 공개 자료 | — | 시크릿 창 `/data.json` 404, 페이지 소스에 메모 없음 | 브라우저 | 미실행 |
-| 3 | 3단계 로그인 | A 로그인 후 목록 `200` | 비로그인·가짜 토큰 `/api/notes` `401` | `npm run bundle` 자기 점검 | 미실행 |
-| 4 | 4단계 소유자 | A가 자기 메모 읽기·수정 `200` | B가 A 메모 `GET·PUT·DELETE` `404` | 브라우저 콘솔(B 토큰), `node --test test/owner.test.mjs` | 미실행 |
-| 5 | 5단계 원본 주소 | 화면에서 A 메모 CRUD | 공개 키·로그인 토큰으로 원본 주소 직접 읽기 `401/403` | `npm run bundle` 자기 점검 | 미실행 |
-| 6 | 6단계 기기 | 등록 기기 `allow` | 미등록 기기 `deny`·`device_not_registered` | `npm run decider:test` | 미실행 |
-| 7 | 7단계 재확인 | 정상 사건 `allow`, 재확인 뒤 `allow` | 복합 이상 `step_up` | `npm run fixture:7`, `node --test test/step7.test.mjs` | 미실행 |
-| 8 | 8단계 구역 | 자기 메모 한 건 `allow` | 메모 전체 목록·공지 수정 `deny`, 학생 공지 수정 `403` | `node --test test/zone.test.mjs`, 브라우저 콘솔 | 미실행 |
-| 9 | 9단계 탐지 | 정상 사건 `observe` | 10분 121건 이상 `propose_revocation` | `npm run detect:test` | 미실행 |
-| 10 | 10단계 복원 | B 메모 한 건 복원 `200`, 해시 같음 | A가 B 사본 복원 `404`, 비로그인 `401` | B 콘솔, `npm run bundle` | 미실행 |
+| 3 | 3단계 로그인 | A 로그인 후 목록 `200` | 비로그인·가짜 토큰 `/api/notes` `401` | `npm run bundle` 자기 점검 | 부분 실행(2026-10-13 `npm run bundle`): 비로그인·가짜 토큰 `/api/notes` `401`. A 로그인 목록은 미실행 |
+| 4 | 4단계 소유자 | A가 자기 메모 읽기·수정 `200` | B가 A 메모 `GET·PUT·DELETE` `404` | 브라우저 콘솔(B 토큰), `node --test test/owner.test.mjs` | 부분 실행(2026-10-13 배포, B 세션): B가 A 메모 `GET` `404`. `PUT·DELETE`는 미실행. `test/owner.test.mjs` 통과 |
+| 5 | 5단계 원본 주소 | 화면에서 A 메모 CRUD | 공개 키·로그인 토큰으로 원본 주소 직접 읽기 `401/403` | `npm run bundle` 자기 점검 | 부분 실행(2026-10-13 `npm run bundle`): 공개 키로 원본 주소 `401`(42501). 로그인 토큰 직접 읽기·화면 CRUD는 미실행 |
+| 6 | 6단계 기기 | 등록 기기 `allow` | 미등록 기기 `deny`·`device_not_registered` | `npm run decider:test` | 실행(로컬 가상 요청): `decider:test` 등록 allow·미등록 deny 통과 |
+| 7 | 7단계 재확인 | 정상 사건 `allow`, 재확인 뒤 `allow` | 복합 이상 `step_up` | `npm run fixture:7`, `node --test test/step7.test.mjs` | 실행(로컬 가상 요청): `fixture:7` 정상 allow·복합 이상 step_up, `test/step7.test.mjs` 통과 |
+| 8 | 8단계 구역 | 자기 메모 한 건 `allow` | 메모 전체 목록·공지 수정 `deny`, 학생 공지 수정 `403` | `node --test test/zone.test.mjs`, 브라우저 콘솔 | 부분 실행: `test/zone.test.mjs` 통과(로컬), `npm run bundle` 비로그인 공지 `401`. 학생 공지 수정 `403`은 복구 전(15:17)에만 확인, 복구 뒤 미실행 |
+| 9 | 9단계 탐지 | 정상 사건 `observe` | 10분 121건 이상 `propose_revocation` | `npm run detect:test` | 실행(로컬 가상 사건): `detect:test` 6/6 통과 |
+| 10 | 10단계 복원 | B 메모 한 건 복원 `200`, 해시 같음 | A가 B 사본 복원 `404`, 비로그인 `401` | B 콘솔, `npm run bundle` | 실행(2026-10-13 16:15 배포, B 세션): B 메모 변조(해시 `92bdf66e…`) 뒤 `POST /api/restore/23cad896…` `200`, 복원 해시 `9e6cf487ae785b97` = 사본 해시, id·소유자 같음, B 메모 1건 그대로. B가 A 메모 복원 `404`. `vault_audit`에 `note_restore · restored` 1줄. 비로그인·가짜 토큰 복원 `401`(bundle) |
 
 로컬 시험(`node --test`, `npm run …:test`)은 가상 요청·가짜 DB 연습이며 심판 판정이 아닙니다.
