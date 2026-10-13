@@ -10,8 +10,19 @@ import { handleCollection, handleItem, handleNoticeCollection, handleNoticeItem,
 const { normal } = fixtureRequests();
 const req = (method, route, path, patch = {}) => ({ ...normal, requestId: randomUUID(), method, route, path, ...patch });
 
+test('판정기: 다른 사용자 메모(등록되지 않은 메모)는 읽기·수정·삭제 거부', async () => {
+  const other = '/notes/00000000-0000-4000-8000-000000000001';
+  for (const m of ['GET', 'PUT', 'DELETE']) {
+    const out = await decide(req(m, `${m} /notes/:id`, other));
+    assert.equal(out.decision, 'deny', m);
+    assert.equal(out.reasonCode, 'note_not_owned');
+  }
+  const otherSubject = await decide(req('GET', 'GET /notes/:id', '/notes/demo', { subjectId: 'learner_other' }));
+  assert.equal(otherSubject.reasonCode, 'note_not_owned');
+});
+
 test('판정기: 자기 메모 읽기·수정은 허용하고 구역 규칙 이름을 남긴다', async () => {
-  for (const [m, r, p] of [['GET', 'GET /notes/:id', '/notes/n1'], ['PUT', 'PUT /notes/:id', '/notes/n1'], ['GET', 'GET /notes', '/notes']]) {
+  for (const [m, r, p] of [['GET', 'GET /notes/:id', '/notes/demo'], ['PUT', 'PUT /notes/:id', '/notes/demo'], ['GET', 'GET /notes', '/notes']]) {
     const out = await decide(req(m, r, p));
     assert.equal(out.decision, 'allow', `${m} ${p}`);
     assert.deepEqual(out.ruleIds, ['device_registered', 'zone_own_notes']);
@@ -28,7 +39,7 @@ test('판정기: 공지 수정은 역할 계약이 없어 거부, 공지(강사 
 
 test('판정기: 알 수 없는 경로·메서드 불일치·쿼리·기능 경로는 거부', async () => {
   const cases = [
-    req('GET', 'GET /notes/:id/export', '/notes/n1/export'),
+    req('GET', 'GET /notes/:id/export', '/notes/demo/export'),
     req('GET', 'GET /export', '/export'),
     req('POST', 'GET /notes/:id', '/notes/n1'),
     req('GET', 'GET /notes/:id', '/notices/n1'),
