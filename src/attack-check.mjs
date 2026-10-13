@@ -207,11 +207,11 @@ async function runStep8Checks(config) {
     const { normal } = fixtureRequests();
     const at = (method, route, path) => decide({ ...normal, requestId: crypto.randomUUID(), method, route, path });
     const own = await at('GET', 'GET /notes/:id', '/notes/demo');
-    const other = await at('GET', 'GET /notes/:id', '/notes/00000000-0000-4000-8000-000000000001');
+    const list = await at('GET', 'GET /notes', '/notes');
     const notice = await at('PUT', 'PUT /notices/:id', '/notices/x1');
     const unknown = await at('GET', 'GET /notes/:id/export', '/notes/n1/export');
-    base.push({ attackId: 'decider_zone_local', expected: '로컬 가상 요청: 자기 메모 allow, 남의 메모·공지 수정·알 수 없는 경로 deny',
-      observed: `로컬 연습(심판 판정 아님) · 자기 메모 ${own.decision} · 남의 메모 ${other.decision}(${other.reasonCode}) · 공지 수정 ${notice.decision}(${notice.reasonCode}) · 기능 경로 ${unknown.decision}(${unknown.reasonCode})` });
+    base.push({ attackId: 'decider_zone_local', expected: '로컬 가상 요청: 자기 메모 allow, 메모 전체 목록·공지 수정·알 수 없는 경로 deny',
+      observed: `로컬 연습(심판 판정 아님) · 자기 메모 ${own.decision} · 메모 전체 목록 ${list.decision}(${list.reasonCode}) · 공지 수정 ${notice.decision}(${notice.reasonCode}) · 기능 경로 ${unknown.decision}(${unknown.reasonCode})` });
   } catch (error) {
     base.push({ attackId: 'decider_zone_local', expected: '로컬 가상 요청: 자기 메모 allow, 공지 수정 deny, 알 수 없는 경로 deny',
       observed: `로컬 연습 오류: ${error.message}`.slice(0, 300) });

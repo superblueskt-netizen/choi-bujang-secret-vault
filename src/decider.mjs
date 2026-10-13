@@ -50,29 +50,17 @@ export function readStepUp(request) {
 }
 
 // 8단계 구역 표: 엔진이 확인한 메서드·경로(route)·실제 경로(path)가 정확히 맞는 것만 구역을 받습니다.
-// 학생에게 허용하는 구역은 자기 메모뿐입니다. 공지(강사 구역)는 읽기·수정 모두 판정기에서 허용하지 않습니다.
+// 학생에게 허용하는 구역은 자기 메모 한 건과 새 메모 쓰기뿐입니다. 여러 사람의 자료를 한꺼번에 여는 메모 전체 목록(GET /notes)과
+// 공지(강사 구역) 읽기·쓰기는 허용하지 않습니다. 메모 한 건의 주인 비교는 자료 API(owner_id)가 합니다.
 // 자료는 경로의 :id 한 칸으로만 고르고, 쿼리로 기능을 고르지 않습니다. :id와 같은 깊이에 export 같은 기능 경로는 두지 않습니다.
 const ID_SEGMENT = '[A-Za-z0-9_-]{1,64}';
 const ZONES = Object.freeze({
-  'GET /notes': { zone: 'own_notes', rule: 'zone_own_notes', path: '/notes' },
   'POST /notes': { zone: 'own_notes', rule: 'zone_own_notes', path: '/notes' },
   'GET /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'PUT /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'DELETE /notes/:id': { zone: 'own_notes', rule: 'zone_own_notes', path: `/notes/${ID_SEGMENT}` },
   'PUT /notices/:id': { zone: 'notice_write', rule: 'zone_notice_write', path: `/notices/${ID_SEGMENT}` },
 });
-// 8단계 메모 소유 등록표: 판정 요청에는 메모 주인이 없으므로, 엔진이 확인한 subjectId에 등록된 메모 id만 한 건 접근을 허용합니다.
-// 등록되지 않은 메모(다른 사용자의 메모 포함)는 기본 거부합니다. 실제 자료의 최종 소유자 대조는 자료 API(owner_id)가 합니다.
-// 여기에는 실제 학생 계정·메모를 넣지 않고, 공개된 가상 정상 요청(scripts/fixture-7.mjs)만 등록합니다.
-const NOTE_OWNERS = Object.freeze({
-  learner_fixture: Object.freeze(['demo']),
-});
-export function ownsNote(request) {
-  const id = String(request?.path ?? '').split('/')[2];
-  const owned = Object.hasOwn(NOTE_OWNERS, request?.subjectId) ? NOTE_OWNERS[request.subjectId] : [];
-  return owned.includes(id);
-}
-
 export function readZone(request) {
   const method = request?.method;
   const route = request?.route;
@@ -119,8 +107,6 @@ export async function decide(request) {
   // 공지 수정은 강사만 가능하지만, 현재 판정 요청 계약에는 엔진이 확인한 역할이 없습니다.
   // 역할을 추측하거나 요청 본문에서 읽지 않고 거부합니다(자료 API도 저장된 강사 목록으로 다시 확인).
   if (zone.zone === 'notice_write') return respond(request, 'deny', 'instructor_role_unverified', ['zone_notice_write']);
-  // 메모 한 건(읽기·수정·삭제)은 엔진이 확인한 사용자에게 등록된 메모일 때만 허용합니다.
-  if (request.route.endsWith('/:id') && !ownsNote(request)) return respond(request, 'deny', 'note_not_owned', ['zone_own_notes']);
   // 7단계 step_up_required: 복합 이상이면 엔진이 확인한 새 로그인(900초 이내) 전까지 추가 확인을 요구합니다.
   if (isCompositeAnomaly(request) && !readStepUp(request).verified) {
     return respond(request, 'step_up', 'step_up_required', ['step_up_required']);

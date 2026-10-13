@@ -178,13 +178,13 @@
 
 - **API 권한 재확인:** 메모는 4단계처럼 저장된 `owner_id`와 검증된 사용자 ID를 비교합니다(남의 메모는 `404`). 공지 수정은 검증된 사용자 ID를 강사 목록과 대조합니다. 화면 메뉴와 요청 본문의 `role`·`isInstructor`는 읽지 않습니다. 거부하면 서버 로그에 `zone deny: owner_mismatch note:<id>`처럼 짧은 사유와 자원 ID만 남기고, 사용자 ID·토큰·본문은 남기지 않습니다.
 - **판정기 구역 규칙** (`src/decider.mjs`): 엔진이 확인한 `subjectId`·`deviceId`·`method`·`route`·`path`를 씁니다. 구역 표에 있는 경로 모양(`route`)과 메서드가 일치하고, 실제 `path`가 그 모양과 정확히 맞으며, 쿼리가 없을 때만 구역을 받습니다.
-  - `zone_own_notes`: `GET·POST /notes`는 허용. `GET·PUT·DELETE /notes/:id`는 엔진이 확인한 `subjectId`에 등록된 메모 id(`NOTE_OWNERS`)일 때만 허용하고, 아니면 `deny`·`note_not_owned`. 등록표에는 공개된 가상 정상 요청(`learner_fixture` → `demo`)만 넣었습니다. 실제 학생 메모는 등록하지 않으므로, 엔진 릴레이를 거치는 실제 한 건 요청은 판정기에서 거부됩니다. 지금 화면은 API를 직접 부르고 최종 소유자 대조는 자료 API가 합니다.
-  - 공지 읽기(`GET /notices`, `GET /notices/:id`)는 강사 구역이라 판정기에서 허용하지 않습니다(`route_not_allowed`). 처음 저장점에서는 허용했다가 심판 판정(S08_OTHER_ZONE_ALLOWED) 뒤 뺐습니다.
+  - `zone_own_notes`: `POST /notes`, `GET·PUT·DELETE /notes/:id` → 허용. 메모 한 건의 주인 비교는 자료 API(`owner_id`)가 합니다. 메모 전체 목록(`GET /notes`)은 여러 사람의 자료를 한꺼번에 여는 경로라 판정기에서 거부합니다(`route_not_allowed`).
+  - 공지 읽기(`GET /notices`, `GET /notices/:id`)는 강사 구역이라 판정기에서 허용하지 않습니다(`route_not_allowed`). 처음 저장점에서는 공지 읽기와 메모 전체 목록을 허용했다가 심판 판정(S08_OTHER_ZONE_ALLOWED) 뒤 뺐습니다.
   - `zone_notice_write`: `PUT /notices/:id` → `deny`·`instructor_role_unverified`. 현재 판정 요청 계약에는 엔진이 확인한 역할이 없어서, 추측하지 않고 거부합니다.
   - `zone_route_allowlist`: 표에 없는 경로(예: `/notes/:id/export`, `/export`), 메서드 불일치, 쿼리 있음, 형식이 틀린 기기 ID → `deny`·`route_not_allowed`
   - 자료는 경로의 `:id` 한 칸으로만 고르고, 쿼리로 기능을 고르지 않습니다. `:id`와 같은 깊이에 기능 경로를 두지 않았습니다.
   - 순서: `device_registered` → 구역 → `step_up_required` → 허용. `RULE_IDS` = `['device_registered', 'step_up_required', 'zone_route_allowlist', 'zone_own_notes', 'zone_notice_write']`.
-- **판정기의 한계:** 판정 요청에는 메모 소유자가 없어서 판정기는 등록표에 있는 메모만 허용하는 기본 거부로 다른 사용자 메모를 막습니다. 자료 API도 `404`로 다시 막습니다. 새 이유 코드 `route_not_allowed`·`instructor_role_unverified`·`note_not_owned`가 운영 등록부의 `allowedReasonCodes`에 있는지는 확인하지 못했습니다.
+- **판정기와 API의 역할:** 판정 요청에는 메모 소유자가 없습니다. 판정기는 경로·메서드로 구역을 나누고, 메모 한 건의 주인 비교는 자료 API가 `404`로 막습니다. 새 이유 코드 `route_not_allowed`·`instructor_role_unverified`가 운영 등록부의 `allowedReasonCodes`에 있는지는 확인하지 못했습니다.
 - **DB SQL (제안, 학생이 검토 후 실행):** `supabase/step8-zones.sql`이 `vault_notices`·`vault_instructors`를 만들고 RLS를 켜고, `anon`·`authenticated` 권한을 회수합니다. 가상 공지 한 건을 넣습니다. 강사 계정은 파일 아래 주석의 이메일만 바꿔서 직접 넣습니다. 이 SQL을 실행하기 전에는 공지 API가 `502`를 돌려줍니다.
 
 ### 확인 순서
