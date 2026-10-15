@@ -1,6 +1,6 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
-export async function runAttackChecks(config) {
+export async function runAttackChecks(config, options = {}) {
   if (config.step === 2) return runStep2Checks(config);
   if (config.step === 3) return runStep3Checks(config);
   if (config.step === 4) return runStep4Checks(config);
@@ -11,7 +11,7 @@ export async function runAttackChecks(config) {
   if (config.step === 9) return runStep9Checks(config);
   if (config.step === 10) return runStep10Checks(config);
   if (config.step === 11) return runStep11Checks(config);
-  if (config.step === 12) return runStep12Checks(config);
+  if (config.step === 12) return runStep12Checks(config, options);
   if (config.step !== 1) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   const app = appUrl(config);
   if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
@@ -312,8 +312,10 @@ async function runStep11Checks(config) {
 
 // 12단계: 서버 GET /api/checks·작전실 화면과 같은 목록·같은 함수(src/checks.mjs)로 점검합니다.
 // GET만 보내고 점검 하나에 요청 한 건, 쓰기 요청이 필요한 점검은 not_run. observed에는 "HTTP 401" 같은 사실만 적습니다.
-async function runStep12Checks(config) {
+async function runStep12Checks(config, options = {}) {
   const { runChecks } = await import('./checks.mjs');
-  const summary = await runChecks({ appUrl: appUrl(config).href, originalApiUrl: config.originalApiUrl });
+  // 실행 환경이 요청 함수를 넘겨주면(options.fetch 또는 config.fetch) 그것을 쓰고, 없으면 기본 fetch를 씁니다.
+  const fetchImpl = typeof options?.fetch === 'function' ? options.fetch : typeof config?.fetch === 'function' ? config.fetch : globalThis.fetch;
+  const summary = await runChecks({ appUrl: appUrl(config).href, originalApiUrl: config.originalApiUrl, fetchImpl });
   return summary.attempts.map(({ attackId, expected, observed }) => ({ attackId, expected, observed }));
 }

@@ -298,7 +298,7 @@
   - **서버 요약** (`GET /api/ops/summary`, `src/ops-api.mjs`, 로그인 필요): 배포된 코드의 판정기 `RULE_IDS`·허용 경로, 탐지 규칙(`burst_read` 10분 120건 초과 → `propose_revocation`), 서버 DB의 내 기기 승인·대기·회수 수, 서버 파일의 정책 사본 봉인 검증 결과(버전·해시 앞자리), 서버 DB의 내 복원 감사 기록(최근 10건, 자원 ID는 앞 8자리만)을 돌려줍니다. 응답에는 요약 ID·서버 확인 시각이 있고, 화면에는 요청 ID(`x-vercel-id`)를 함께 표시합니다. 메모 본문·토큰·전체 사용자 ID·공개키는 넣지 않습니다.
   - **탐지 사건:** 엔진이 검증한 실제 사건을 이 서버로 전달하는 경로가 연결되지 않아 **미실행**으로 표시합니다. 회수 집행도 엔진·심판 몫입니다.
 - **점검 결과** (`GET /api/checks`, `src/checks.mjs`·`src/checks-api.mjs`·`src/rule-cases.mjs`, 로그인 불필요): 제출 묶음(`npm run bundle`)과 **같은 목록·같은 함수**로 서버가 자기 공개 주소에 점검 요청을 실제로 보내고 `{checkedAt, commit, total, blocked, failed, notRun, attempts}`를 돌려줍니다. 작전실 화면은 이 응답을 그대로 그리며 따로 계산하지 않습니다.
-  - 점검은 20건이고 GET만 보냅니다. 점검 하나에 요청은 한 건이고 전체는 24건 이하입니다. `observed`에는 `HTTP 401`, `HTTP 200; jsonReady=true` 같은 사실만 적고 설명은 `expected`에 둡니다. 요청마다 고유한 `requestKey`(UUID)를 `alephEvidence`에 남깁니다.
+  - 점검은 20건이고 GET만 보냅니다. 점검 하나에 요청은 한 건이고 전체는 24건 이하입니다. `observed`에는 `HTTP 401`, `HTTP 200; jsonReady=true` 같은 사실만 적고 설명은 `expected`에 둡니다. 요청을 보낼 때마다 `alephEvidence: { attackId, requestKey }`(requestKey는 요청마다 새 UUID)를 요청 옵션과 `X-Aleph-Evidence` 헤더로 함께 넘기고, 같은 requestKey를 결과의 `alephEvidence`에 남깁니다. 요청은 목록 순서대로 하나씩 보냅니다.
   - 쓰기 요청이 필요한 2건(`s10-restore-unauth` 복원 POST, `s11-unsigned-write` 수정 PUT)은 보내지 않고 `not_run`입니다.
   - 규칙 점검 6건(`/api/checks?case=…`)은 학생 판정기·학생 탐지 규칙·정책 사본 검증을 가상 입력으로 실행해 `jsonReady`·`blocked`·출처(`source`)를 돌려주고, `engine: 'ALEPH SDP 엔진'`, `engineEnforced: 'not_run'`(엔진이 실제로 집행했는지는 미실행)을 붙입니다.
   - 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.

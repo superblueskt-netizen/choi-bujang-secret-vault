@@ -40,7 +40,10 @@ export const CHECKS = Object.freeze([
 export async function runChecks({ appUrl, originalApiUrl, fetchImpl = fetch, commit = null, now = () => new Date() }) {
   const base = new URL(appUrl);
   let sent = 0;
-  const attempts = await Promise.all(CHECKS.map(async (check) => {
+  // 요청은 목록 순서대로 하나씩 보냅니다(동시 전송 없음).
+  const attempts = [];
+  for (const check of CHECKS) attempts.push(await runOne(check));
+  async function runOne(check) {
     const row = { attackId: check.attackId, stage: check.stage, expected: check.expected };
     if (check.write) return { ...row, observed: 'not_run', result: 'not_run' };
     const url = check.external ? (check.external === 'originalApiUrl' ? originalApiUrl : null) : new URL(check.path, base).href;
@@ -49,8 +52,11 @@ export async function runChecks({ appUrl, originalApiUrl, fetchImpl = fetch, com
     const requestKey = randomUUID();
     let response; let text = '';
     try {
-      response = await fetchImpl(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(8000),
-        headers: { 'X-Aleph-Attack-Id': check.attackId, 'X-Aleph-Request-Key': requestKey, ...(check.headers ?? {}) } });
+      // 심판 격리 환경이 요청을 점검과 짝지을 수 있게, 요청마다 alephEvidence(attackId·고유 requestKey)를 함께 넘깁니다.
+      // 일반 fetch는 이 옵션을 무시합니다. 같은 값을 X-Aleph-Evidence 헤더에도 넣습니다.
+      const alephEvidence = { attackId: check.attackId, requestKey };
+      response = await fetchImpl(url, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(8000), alephEvidence,
+        headers: { 'X-Aleph-Evidence': JSON.stringify(alephEvidence), 'X-Aleph-Attack-Id': check.attackId, ...(check.headers ?? {}) } });
       text = await response.text();
     } catch {
       return { ...row, observed: 'not_run', result: 'not_run', alephEvidence: { requestKey } };
@@ -63,7 +69,7 @@ export async function runChecks({ appUrl, originalApiUrl, fetchImpl = fetch, com
     if (check.json) blocked = blocked && jsonReady;
     if (check.noMarker) blocked = blocked && !text.includes('실습용 가상');
     return { ...row, observed, result: blocked ? 'blocked' : 'failed', alephEvidence: { requestKey, checkedAt: now().toISOString() } };
-  }));
+  }
   const count = (r) => attempts.filter((a) => a.result === r).length;
   return { checkedAt: now().toISOString(), commit, total: attempts.length, blocked: count('blocked'), failed: count('failed'), notRun: count('not_run'), attempts };
 }
