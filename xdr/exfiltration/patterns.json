@@ -1,0 +1,37 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "exfiltration",
+  "source": "MITRE ATT&CK T1041 Exfiltration Over C2 Channel (https://attack.mitre.org/techniques/T1041/) · T1048 Exfiltration Over Alternative Protocol (https://attack.mitre.org/techniques/T1048/)",
+  "patterns": [
+    {
+      "name": "bulk-transfer-new-destination",
+      "technique": "T1048",
+      "condition": "처음 보는·외부 목적지나 평소에 쓰지 않던 포트로 50MB 이상 또는 자료 50건 이상이 나감",
+      "evidence": "T1048: 공격자는 평소 통로가 아닌 다른 프로토콜·목적지로 대량 자료를 빼내므로, 처음 보는 곳으로 가는 대용량 전송이 핵심 신호다."
+    },
+    {
+      "name": "off-hours-archive-exfil",
+      "technique": "T1048",
+      "condition": "수업·업무 시간 밖에 압축 파일 또는 50MB 이상 자료가 바깥으로 나감",
+      "evidence": "T1048: 유출은 감시가 느슨한 시간에 압축한 묶음으로 내보내는 경우가 많아, 업무 시간 밖 압축 파일 반출은 유출 신호다."
+    },
+    {
+      "name": "archive-to-new-destination",
+      "technique": "T1048",
+      "condition": "압축 파일이 처음 보는 주소로 50MB 이상 올라감",
+      "evidence": "T1048: 자료를 압축해 한 덩어리로 낯선 주소에 올리는 것은 다른 프로토콜을 통한 유출의 전형적인 형태다."
+    },
+    {
+      "name": "repeated-transfer-c2-channel",
+      "technique": "T1041",
+      "condition": "같은 목적지나 명령 통로로 대용량(50MB 이상) 전송이 5번 이상 반복됨",
+      "evidence": "T1041: 공격자는 이미 열어 둔 명령 통로로 자료를 여러 번 나눠 보내므로, 같은 목적지로의 반복 대용량 전송은 유출 신호다."
+    },
+    {
+      "name": "transfer-unconfirmed",
+      "technique": "T1041 / T1048",
+      "condition": "외부 전송 경보(규칙 수준 4 이상)지만 50MB 미만이고 대량 건수·반복도 없음",
+      "evidence": "T1041·T1048 탐지 지침은 전송량·목적지를 평소와 비교해 확인하라고 하므로, 작은 전송·실패·평소 목적지의 변화는 확인이 필요하다."
+    }
+  ]
+}

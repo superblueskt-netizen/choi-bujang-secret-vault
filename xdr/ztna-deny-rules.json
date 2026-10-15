@@ -677,6 +677,151 @@
       "confidence": 0.89,
       "createdAt": "2026-10-15T05:38:02.070Z",
       "expiresAt": "2026-10-15T06:38:02.070Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.203.0.113.50",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "203.0.113.50"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-01",
+        "ex-03"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination",
+        "repeated-transfer-c2-channel"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.198.51.100.40",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "198.51.100.40"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-02",
+        "ex-04"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination",
+        "off-hours-archive-exfil",
+        "archive-to-new-destination"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.203.0.113.55",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "203.0.113.55"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-05"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination"
+      ],
+      "confidence": 0.86,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.192.0.2.90",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "192.0.2.90"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-06"
+      ],
+      "patterns": [
+        "off-hours-archive-exfil",
+        "repeated-transfer-c2-channel"
+      ],
+      "confidence": 0.97,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.198.51.100.45",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "198.51.100.45"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-07"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination",
+        "archive-to-new-destination"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.203.0.113.60",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "203.0.113.60"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-08"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.203.0.113.61",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "203.0.113.61"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-09"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination",
+        "repeated-transfer-c2-channel"
+      ],
+      "confidence": 0.91,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
+    },
+    {
+      "ruleId": "xdr.exfiltration.deny.198.51.100.46",
+      "effect": "deny",
+      "match": {
+        "destinationIp": "198.51.100.46"
+      },
+      "reasonCode": "xdr_exfiltration",
+      "evidenceAlertIds": [
+        "ex-10"
+      ],
+      "patterns": [
+        "bulk-transfer-new-destination",
+        "archive-to-new-destination"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:50:38.697Z",
+      "expiresAt": "2026-10-15T06:50:38.697Z"
     }
   ]
 }
