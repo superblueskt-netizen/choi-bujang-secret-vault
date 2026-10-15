@@ -1,0 +1,31 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "privilege",
+  "source": "MITRE ATT&CK T1068 Exploitation for Privilege Escalation (https://attack.mitre.org/techniques/T1068/) · T1078 Valid Accounts (https://attack.mitre.org/techniques/T1078/)",
+  "patterns": [
+    {
+      "name": "admin-group-add",
+      "technique": "T1078",
+      "condition": "평범한 계정이 관리자 그룹(administrators)에 추가됨 — 원격 주소·여러 계정 동시 추가·빠졌다 다시 들어옴이면 더 뚜렷함",
+      "evidence": "T1078: 공격자는 손에 넣은 정상 계정을 관리자 그룹에 넣어 높은 권한을 정상 사용자처럼 쓴다."
+    },
+    {
+      "name": "unseen-admin-command",
+      "technique": "T1068",
+      "condition": "방금 관리자가 됐거나 처음 보는 주소·다른 계정 권한으로 관리자 명령을 실행하거나 세션이 관리자 권한으로 바뀜",
+      "evidence": "T1068: 권한 상승을 악용한 공격자는 얻은 관리자 권한으로 곧바로 평소에 없던 관리자 명령을 실행한다."
+    },
+    {
+      "name": "off-hours-privilege-use",
+      "technique": "T1078",
+      "condition": "수업·업무 시간 밖에 관리자 그룹 추가나 관리자 명령 실행이 있음",
+      "evidence": "T1078: 탈취한 정상 계정은 주인이 없는 시간에 쓰이는 경우가 많아, 업무 시간 밖 권한 사용은 도용 신호다."
+    },
+    {
+      "name": "privilege-change-unconfirmed",
+      "technique": "T1068 / T1078",
+      "condition": "권한·그룹 관련 경보(규칙 수준 4 이상)지만 관리자 그룹 추가·처음 보는 관리자 명령·업무 시간 밖 사용이 없음",
+      "evidence": "T1078 탐지 지침은 계정 권한 변경을 평소 행동과 비교해 확인하라고 하므로, 취소된 상승·과제 그룹 추가·평소 주소의 명령은 확인이 필요하다."
+    }
+  ]
+}
