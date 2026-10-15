@@ -2,7 +2,7 @@
 // - 결과는 서버 관측(aleph_check_observations의 caseId·requestKey·상태)으로만 정합니다. 관측되지 않은 점검은 not_run입니다.
 // - 제출 묶음은 공개 HTTPS 주소에 GET만, 점검 하나에 요청 한 건(+ 마지막 관측 확인 한 건), 전체 24건 이하로 보냅니다.
 // - 서버가 관측할 수 없는 정적 파일·외부 주소 점검과 쓰기 요청이 필요한 점검은 보내지 않고 not_run으로 둡니다.
-// - observed에는 사실만 적습니다: "HTTP 401", 규칙 점검은 "HTTP 200; jsonReady=true".
+// - observed에는 실제로 받은 HTTP 상태만 적습니다: "HTTP 401", "HTTP 200".
 // - 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않습니다. 이 목록에 없는 공격을 막음으로 세지 않습니다.
 import { randomUUID } from 'node:crypto';
 
@@ -40,8 +40,9 @@ export const CHECKS = Object.freeze([
 function judge(check, obs) {
   const row = { attackId: check.attackId, stage: check.stage, expected: check.expected };
   if (check.skip || !obs) return { ...row, observed: 'not_run', result: 'not_run' };
+  // observed에는 실제 HTTP 상태만 적습니다. 규칙 점검의 막음 여부는 서버가 자기 응답에서 관측한 json_ready로만 셉니다(HTTP 200만으로 막음 처리하지 않음).
   const jsonReady = obs.json_ready === true;
-  const observed = check.json ? `HTTP ${obs.status}; jsonReady=${jsonReady}` : `HTTP ${obs.status}`;
+  const observed = `HTTP ${obs.status}`;
   const blocked = check.ok.includes(obs.status) && (!check.json || jsonReady);
   return { ...row, observed, result: blocked ? 'blocked' : 'failed',
     alephEvidence: { caseId: obs.case_id, requestKey: obs.request_key, observedAt: obs.at } };

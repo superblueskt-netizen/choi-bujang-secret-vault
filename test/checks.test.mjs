@@ -43,7 +43,7 @@ test('제출 묶음: GET만·24건 이하, 서버가 관측한 요청만 HTTP �
     const sentReq = log.find((r) => r.evidence?.attackId === a.attackId);
     assert.equal(a.alephEvidence.caseId, a.attackId);
     assert.equal(a.alephEvidence.requestKey, sentReq.evidence.requestKey);
-    assert.match(a.observed, /^HTTP \d{3}(; jsonReady=(true|false))?$/u);
+    assert.match(a.observed, /^HTTP \d{3}$/u);
   }
 });
 
