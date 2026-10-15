@@ -299,7 +299,7 @@
   - **탐지 사건:** 엔진이 검증한 실제 사건을 이 서버로 전달하는 경로가 연결되지 않아 **미실행**으로 표시합니다. 회수 집행도 엔진·심판 몫입니다.
 - **점검 결과** (`GET /api/checks`, `src/checks.mjs`·`src/checks-api.mjs`·`src/observe.mjs`·`src/rule-cases.mjs`, 로그인 불필요): 서버는 새로 요청을 보내지 않고, **서버가 실제로 받아 남긴 관측 기록**(`aleph_check_observations`: caseId·requestKey·상태·jsonReady·시각)만으로 `{checkedAt, commit, total, blocked, failed, notRun, attempts}`를 만듭니다. 관측되지 않은 점검은 `not_run`입니다. 작전실 화면은 이 응답을 그대로 그립니다.
   - **서버 관측:** API 함수는 `withObservation`으로 감싸져 있어, 점검 요청이 `X-Aleph-Case-Id`·`X-Aleph-Request-Key`(또는 `X-Aleph-Evidence`) 헤더를 달고 오면 응답을 보내기 직전에 caseId·requestKey·상태를 DB에 남깁니다. 메모 본문·토큰·사용자 ID·쿼리 값은 남기지 않습니다. 표는 `supabase/step12-observations.sql`로 만듭니다.
-  - **제출 묶음:** 점검마다 GET 요청을 한 건 보내며 요청 옵션 `alephEvidence: { attackId, caseId, requestKey }`와 위 헤더를 함께 넘깁니다(requestKey는 요청마다 새 UUID, 목록 순서대로 하나씩). 마지막에 `GET /api/checks?requestKeys=…`로 서버 관측을 읽어, **보낸 requestKey와 caseId가 서버 관측과 일치하는 점검만** 서버가 관측한 HTTP 상태를 `observed`에 적고, 나머지는 `not_run`입니다. 요청은 전체 24건 이하입니다.
+  - **제출 묶음:** 점검마다 GET 요청을 한 건 보내며 요청 옵션 `alephEvidence: { attackId, caseId, requestKey }`와 위 헤더를 함께 넘깁니다(requestKey는 요청마다 새 UUID, 목록 순서대로 하나씩). `observed`에는 **실제로 받은 응답의 HTTP 상태**(규칙 점검은 응답의 `jsonReady`)를 적고, 보내지 않았거나 요청이 실패한 점검만 `not_run`입니다. 요청은 전체 24건 이하입니다.
   - **보내지 않는 점검(not_run):** 서버가 관측할 수 없는 정적 파일(`s01-static-notes`, `s02-static-copy`)과 외부 Supabase 주소(`s05-direct-table`), 쓰기 요청이 필요한 `s10-restore-unauth`(POST)·`s11-unsigned-write`(PUT).
   - 규칙 점검 6건(`/api/checks?case=…`)은 학생 판정기·학생 탐지 규칙·정책 사본 검증을 가상 입력으로 실행해 `jsonReady`·`blocked`·출처(`source`)를 돌려주고, `engine: 'ALEPH SDP 엔진'`, `engineEnforced: 'not_run'`을 붙입니다.
   - 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.
@@ -310,7 +310,7 @@
 - 심판은 `npm run bundle`을 격리 환경에서 실행하며, 그 환경에서는 `node:fs`·`node:path`·`node:url`·`node:child_process`(git 읽기)·`node:crypto`만 쓰고 공개 HTTPS 주소에 **GET·HEAD**만 보낼 수 있습니다.
 - 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 결과는 로컬 시험으로만 확인했습니다(실제 요청은 미실행).
 - 9단계 탐지 점검은 `node:util`을 쓰는 `scripts/detect-test.mjs`를 불러오지 않고 같은 6개 사례를 직접 만들어 확인합니다.
-- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 요청마다 `alephEvidence`(attackId·caseId·requestKey)를 넘기고, 서버 관측(`/api/checks?requestKeys=`)과 caseId·requestKey가 일치하는 점검만 HTTP 상태를 적습니다. 연결되지 않은 점검은 `not_run`입니다.
+- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 요청마다 `alephEvidence`(attackId·caseId·requestKey)를 넘기고, 보낸 요청은 실제 응답 HTTP 상태를, 보내지 않은 점검만 `not_run`을 적습니다. 서버는 같은 caseId·requestKey로 관측 기록을 남기고 `/api/checks`는 그 기록으로 점검표를 만듭니다.
 
 ### 출처: 제공 엔진·시작 틀과 학생 작업
 

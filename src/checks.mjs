@@ -58,31 +58,30 @@ export function fromObservations(rows, opts) {
   return summarize(CHECKS.map((c) => judge(c, latest.get(c.attackId))), opts);
 }
 
-// 제출 묶음: 점검 요청을 보내고(증거: caseId·requestKey), 서버가 관측한 기록으로만 결과를 적습니다.
+// 제출 묶음: 점검 요청을 보내고(증거: caseId·requestKey), 실제로 받은 응답의 HTTP 상태를 그대로 적습니다.
+// 보내지 않은 점검(정적 파일·외부 주소·쓰기 요청)과 요청이 실패한 점검만 not_run입니다. 상태를 추측하거나 계산하지 않습니다.
 export async function runChecks({ appUrl, fetchImpl = fetch, commit = null, now = () => new Date() }) {
   const base = new URL(appUrl);
-  const sent = new Map();
+  const attempts = [];
+  let sent = 0;
   for (const check of CHECKS) {
-    if (check.skip || sent.size >= MAX_REQUESTS - 1) continue;
+    if (check.skip || sent >= MAX_REQUESTS) { attempts.push(judge(check, null)); continue; }
     const requestKey = randomUUID();
     const alephEvidence = { attackId: check.attackId, caseId: check.attackId, requestKey };
+    let response; let text = '';
     try {
-      await fetchImpl(new URL(check.path, base).href, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(8000), alephEvidence,
+      sent += 1;
+      response = await fetchImpl(new URL(check.path, base).href, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(8000), alephEvidence,
         headers: { 'X-Aleph-Case-Id': check.attackId, 'X-Aleph-Request-Key': requestKey, 'X-Aleph-Evidence': JSON.stringify(alephEvidence), ...(check.headers ?? {}) } });
-      sent.set(check.attackId, requestKey);
-    } catch { /* 보내지 못함 → not_run */ }
+      text = await response.text();
+    } catch {
+      attempts.push(judge(check, null));
+      continue;
+    }
+    let body = null;
+    try { body = JSON.parse(text); } catch { /* JSON 아님 */ }
+    attempts.push(judge(check, { case_id: check.attackId, request_key: requestKey, status: response.status,
+      json_ready: body?.jsonReady === true && body?.blocked === true, at: now().toISOString() }));
   }
-  let rows = [];
-  if (sent.size) {
-    try {
-      const url = new URL('/api/checks', base);
-      url.searchParams.set('requestKeys', [...sent.values()].join(','));
-      const res = await fetchImpl(url.href, { method: 'GET', redirect: 'error', signal: AbortSignal.timeout(8000) });
-      const body = await res.json();
-      rows = Array.isArray(body?.observations) ? body.observations : [];
-    } catch { rows = []; }
-  }
-  // 이번에 보낸 requestKey와 caseId가 모두 맞는 관측만 씁니다.
-  const byCase = new Map(rows.filter((r) => sent.get(r.case_id) === r.request_key).map((r) => [r.case_id, r]));
-  return summarize(CHECKS.map((c) => judge(c, byCase.get(c.attackId))), { commit, now });
+  return summarize(attempts, { commit, now });
 }

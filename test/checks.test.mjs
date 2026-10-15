@@ -47,10 +47,13 @@ test('제출 묶음: GET만·24건 이하, 서버가 관측한 요청만 HTTP �
   }
 });
 
-test('서버 관측이 연결되지 않으면 HTTP 상태를 적지 않고 not_run', async () => {
+test('보낸 요청은 서버 관측과 상관없이 실제 응답 상태를 적고, 요청이 실패한 점검만 not_run', async () => {
   rows = [];
   const out = await runChecks({ appUrl, fetchImpl: fakeFetch([], { dropObservation: true }) });
-  assert.equal(out.notRun, out.total);
+  assert.equal(out.notRun, 5);
+  assert.equal(out.blocked, 15);
+  const failing = await runChecks({ appUrl, fetchImpl: async () => { throw new Error('network'); } });
+  assert.equal(failing.notRun, failing.total);
 });
 
 test('제출 묶음과 /api/checks(서버 관측 기록)가 같은 결과', async () => {
