@@ -397,6 +397,128 @@
       "confidence": 0.95,
       "createdAt": "2026-10-13T07:25:21.940Z",
       "expiresAt": "2026-10-13T08:25:21.940Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.203.0.113.12",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.12"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-01",
+        "ps-02"
+      ],
+      "patterns": [
+        "new-service-temp-binary",
+        "scheduled-task-temp-binary"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.198.51.100.12",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.12"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-03"
+      ],
+      "patterns": [
+        "startup-folder-unknown-program"
+      ],
+      "confidence": 0.91,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.192.0.2.12",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.12"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-04"
+      ],
+      "patterns": [
+        "repeated-unsigned-service-registration"
+      ],
+      "confidence": 0.95,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.203.0.113.19",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.19"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-05"
+      ],
+      "patterns": [
+        "scheduled-task-temp-binary"
+      ],
+      "confidence": 0.88,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.198.51.100.19",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "198.51.100.19"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-06"
+      ],
+      "patterns": [
+        "new-service-temp-binary"
+      ],
+      "confidence": 0.94,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.192.0.2.19",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "192.0.2.19"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-07"
+      ],
+      "patterns": [
+        "scheduled-task-temp-binary",
+        "startup-folder-unknown-program"
+      ],
+      "confidence": 0.92,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
+    },
+    {
+      "ruleId": "xdr.persistence.deny.203.0.113.33",
+      "effect": "deny",
+      "match": {
+        "sourceIp": "203.0.113.33"
+      },
+      "reasonCode": "xdr_persistence",
+      "evidenceAlertIds": [
+        "ps-08"
+      ],
+      "patterns": [
+        "new-service-temp-binary"
+      ],
+      "confidence": 0.91,
+      "createdAt": "2026-10-15T05:31:37.136Z",
+      "expiresAt": "2026-10-15T06:31:37.136Z"
     }
   ]
 }

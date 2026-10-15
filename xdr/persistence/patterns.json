@@ -1,0 +1,37 @@
+{
+  "schema": "aleph.xdr.patterns.v1",
+  "moduleKey": "persistence",
+  "source": "MITRE ATT&CK T1543.003 Windows Service (https://attack.mitre.org/techniques/T1543/003/) · T1053.005 Scheduled Task (https://attack.mitre.org/techniques/T1053/005/) · T1547.001 Startup Folder (https://attack.mitre.org/techniques/T1547/001/)",
+  "patterns": [
+    {
+      "name": "new-service-temp-binary",
+      "technique": "T1543.003",
+      "condition": "새로 생기거나 바뀐 서비스가 임시 폴더(AppData\\Local\\Temp)의 실행 파일을 가리키거나, 평소 목록에 없고 서명이 없음",
+      "evidence": "T1543.003: 공격자는 서비스를 만들거나 서비스 실행 파일을 바꿔 다시 켜도 악성 프로그램이 자동 실행되게 한다."
+    },
+    {
+      "name": "scheduled-task-temp-binary",
+      "technique": "T1053.005",
+      "condition": "처음 보거나 이름이 임의 문자열인 예약 작업이 임시 폴더의 실행 파일을 실행함",
+      "evidence": "T1053.005: 공격자는 예약 작업으로 악성 프로그램을 정해진 시각·재부팅 때 반복 실행해 머문다(선버스트 공격자도 예약 작업을 잠깐 바꿔 썼다)."
+    },
+    {
+      "name": "startup-folder-unknown-program",
+      "technique": "T1547.001",
+      "condition": "사용자 시작 폴더(Start Menu\\Programs\\Startup)에 평소 목록에 없는 실행 파일이 추가됨",
+      "evidence": "T1547.001: 시작 폴더에 놓인 프로그램은 사용자가 로그인할 때마다 자동 실행되므로 지속성 확보에 쓰인다."
+    },
+    {
+      "name": "repeated-unsigned-service-registration",
+      "technique": "T1543.003",
+      "condition": "같은 출발 주소에서 서명 없는 서비스 등록이 2건 이상 연속됨",
+      "evidence": "T1543.003: 원격에서 서비스를 연달아 만드는 것은 원격 실행·지속성 도구가 서비스를 심는 전형적인 형태다."
+    },
+    {
+      "name": "persistence-change-unconfirmed",
+      "technique": "T1543 / T1053",
+      "condition": "서비스·예약 작업·시작 항목 경보(규칙 수준 4 이상)지만 임시 폴더·서명 없음·평소 목록 밖 같은 뚜렷한 신호가 없음",
+      "evidence": "T1543·T1053 의 탐지 지침은 새 서비스·예약 작업을 평소 목록과 비교해 확인하라고 하므로, 수업 경로·서명 미확인만 있는 변경은 확인이 필요하다."
+    }
+  ]
+}
