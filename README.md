@@ -297,19 +297,20 @@
 - **작전실 화면** `/ops.html` (`public/ops.html`, 자료실 화면 오른쪽 위 「탈환 작전실」 링크)
   - **서버 요약** (`GET /api/ops/summary`, `src/ops-api.mjs`, 로그인 필요): 배포된 코드의 판정기 `RULE_IDS`·허용 경로, 탐지 규칙(`burst_read` 10분 120건 초과 → `propose_revocation`), 서버 DB의 내 기기 승인·대기·회수 수, 서버 파일의 정책 사본 봉인 검증 결과(버전·해시 앞자리), 서버 DB의 내 복원 감사 기록(최근 10건, 자원 ID는 앞 8자리만)을 돌려줍니다. 응답에는 요약 ID·서버 확인 시각이 있고, 화면에는 요청 ID(`x-vercel-id`)를 함께 표시합니다. 메모 본문·토큰·전체 사용자 ID·공개키는 넣지 않습니다.
   - **탐지 사건:** 엔진이 검증한 실제 사건을 이 서버로 전달하는 경로가 연결되지 않아 **미실행**으로 표시합니다. 회수 집행도 엔진·심판 몫입니다.
-- **점검 결과** (`GET /api/checks`, `src/checks.mjs`·`src/checks-api.mjs`·`src/rule-cases.mjs`, 로그인 불필요): 제출 묶음(`npm run bundle`)과 **같은 목록·같은 함수**로 서버가 자기 공개 주소에 점검 요청을 실제로 보내고 `{checkedAt, commit, total, blocked, failed, notRun, attempts}`를 돌려줍니다. 작전실 화면은 이 응답을 그대로 그리며 따로 계산하지 않습니다.
-  - 점검은 20건이고 GET만 보냅니다. 점검 하나에 요청은 한 건이고 전체는 24건 이하입니다. `observed`에는 `HTTP 401`, `HTTP 200; jsonReady=true` 같은 사실만 적고 설명은 `expected`에 둡니다. 요청을 보낼 때마다 `alephEvidence: { attackId, requestKey }`(requestKey는 요청마다 새 UUID)를 요청 옵션과 `X-Aleph-Evidence` 헤더로 함께 넘기고, 같은 requestKey를 결과의 `alephEvidence`에 남깁니다. 요청은 목록 순서대로 하나씩 보냅니다.
-  - 쓰기 요청이 필요한 2건(`s10-restore-unauth` 복원 POST, `s11-unsigned-write` 수정 PUT)은 보내지 않고 `not_run`입니다.
-  - 규칙 점검 6건(`/api/checks?case=…`)은 학생 판정기·학생 탐지 규칙·정책 사본 검증을 가상 입력으로 실행해 `jsonReady`·`blocked`·출처(`source`)를 돌려주고, `engine: 'ALEPH SDP 엔진'`, `engineEnforced: 'not_run'`(엔진이 실제로 집행했는지는 미실행)을 붙입니다.
+- **점검 결과** (`GET /api/checks`, `src/checks.mjs`·`src/checks-api.mjs`·`src/observe.mjs`·`src/rule-cases.mjs`, 로그인 불필요): 서버는 새로 요청을 보내지 않고, **서버가 실제로 받아 남긴 관측 기록**(`aleph_check_observations`: caseId·requestKey·상태·jsonReady·시각)만으로 `{checkedAt, commit, total, blocked, failed, notRun, attempts}`를 만듭니다. 관측되지 않은 점검은 `not_run`입니다. 작전실 화면은 이 응답을 그대로 그립니다.
+  - **서버 관측:** API 함수는 `withObservation`으로 감싸져 있어, 점검 요청이 `X-Aleph-Case-Id`·`X-Aleph-Request-Key`(또는 `X-Aleph-Evidence`) 헤더를 달고 오면 응답을 보내기 직전에 caseId·requestKey·상태를 DB에 남깁니다. 메모 본문·토큰·사용자 ID·쿼리 값은 남기지 않습니다. 표는 `supabase/step12-observations.sql`로 만듭니다.
+  - **제출 묶음:** 점검마다 GET 요청을 한 건 보내며 요청 옵션 `alephEvidence: { attackId, caseId, requestKey }`와 위 헤더를 함께 넘깁니다(requestKey는 요청마다 새 UUID, 목록 순서대로 하나씩). 마지막에 `GET /api/checks?requestKeys=…`로 서버 관측을 읽어, **보낸 requestKey와 caseId가 서버 관측과 일치하는 점검만** 서버가 관측한 HTTP 상태를 `observed`에 적고, 나머지는 `not_run`입니다. 요청은 전체 24건 이하입니다.
+  - **보내지 않는 점검(not_run):** 서버가 관측할 수 없는 정적 파일(`s01-static-notes`, `s02-static-copy`)과 외부 Supabase 주소(`s05-direct-table`), 쓰기 요청이 필요한 `s10-restore-unauth`(POST)·`s11-unsigned-write`(PUT).
+  - 규칙 점검 6건(`/api/checks?case=…`)은 학생 판정기·학생 탐지 규칙·정책 사본 검증을 가상 입력으로 실행해 `jsonReady`·`blocked`·출처(`source`)를 돌려주고, `engine: 'ALEPH SDP 엔진'`, `engineEnforced: 'not_run'`을 붙입니다.
   - 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.
-- 확인: `node --test test/ops.test.mjs test/checks.test.mjs`(요약이 서버 값만 씀·비로그인 401·화면이 /api/checks를 그대로 그림, 점검이 GET만·24건 이하·쓰기는 not_run, 제출 묶음과 /api/checks 결과가 같음, 규칙 점검 출처·엔진 표시).
+- 확인: `node --test test/ops.test.mjs test/checks.test.mjs`(요약이 서버 값만 씀·비로그인 401·화면이 /api/checks를 그대로 그림, 점검이 GET만·24건 이하, 서버 관측과 연결된 점검만 HTTP 상태·연결 안 되면 not_run, 제출 묶음과 /api/checks 결과가 같음, 규칙 점검 출처·엔진 표시).
 
 ### 제출 묶음 자기 점검의 제한 (심판 `S12_BUNDLE_UNSUPPORTED` 뒤 수정)
 
 - 심판은 `npm run bundle`을 격리 환경에서 실행하며, 그 환경에서는 `node:fs`·`node:path`·`node:url`·`node:child_process`(git 읽기)·`node:crypto`만 쓰고 공개 HTTPS 주소에 **GET·HEAD**만 보낼 수 있습니다.
 - 그래서 `src/attack-check.mjs`는 쓰기 요청(로그인 없는 메모 추가·삭제, 공지 수정, 복원)을 보내지 않고 `observed`를 `not_run`으로 둡니다. 실행하지 않은 다른 점검과 네트워크 실패도 `not_run`입니다. 이 쓰기 요청들의 결과는 로컬 시험으로만 확인했습니다(실제 요청은 미실행).
 - 9단계 탐지 점검은 `node:util`을 쓰는 `scripts/detect-test.mjs`를 불러오지 않고 같은 6개 사례를 직접 만들어 확인합니다.
-- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 `src/checks.mjs`의 점검 목록·실행 함수를 `GET /api/checks`와 함께 씁니다. 점검마다 GET 요청을 한 번씩만 보내고 `observed`에는 상태 같은 사실만 적으며, 요청을 보내지 않은 점검은 `not_run`입니다.
+- (심판 「실행 기록 대조」 뒤 수정) 12단계 자기 점검은 요청마다 `alephEvidence`(attackId·caseId·requestKey)를 넘기고, 서버 관측(`/api/checks?requestKeys=`)과 caseId·requestKey가 일치하는 점검만 HTTP 상태를 적습니다. 연결되지 않은 점검은 `not_run`입니다.
 
 ### 출처: 제공 엔진·시작 틀과 학생 작업
 
@@ -321,7 +322,7 @@
 
 | 대상 | 설치 | 실행 | 중지 | 복구 |
 |---|---|---|---|---|
-| 자료실·접속 앱 (Vercel) | GitHub 저장소를 Vercel 프로젝트에 연결하고, Vercel 환경변수에 `SUPABASE_URL`·`SUPABASE_SECRET_KEY`를 학생이 직접 넣습니다. Supabase SQL Editor에서 `supabase/step2~step11` SQL을 차례로 실행합니다(`*.local.sql`은 각자 이메일로). | `git push origin main` → Vercel 자동 배포. 자동 배포가 안 되면 Vercel Deployments → `…` → Create Deployment → `main`. 로컬 화면만: `npm run build -- --local` | Vercel 프로젝트 Settings에서 배포를 멈추거나 이전 배포로 Rollback합니다. 기기 하나만 막을 때는 `vault_devices`의 그 기기를 `revoked`로 바꿉니다. | Vercel에서 이전 정상 배포로 Promote/Rollback하거나, Git에서 정상 커밋을 다시 배포합니다. 메모 한 건은 `POST /api/restore/:id`, 시험 정책은 아래 「정책 복원」 |
+| 자료실·접속 앱 (Vercel) | GitHub 저장소를 Vercel 프로젝트에 연결하고, Vercel 환경변수에 `SUPABASE_URL`·`SUPABASE_SECRET_KEY`를 학생이 직접 넣습니다. Supabase SQL Editor에서 `supabase/step2~step12` SQL을 차례로 실행합니다(`*.local.sql`은 각자 이메일로). | `git push origin main` → Vercel 자동 배포. 자동 배포가 안 되면 Vercel Deployments → `…` → Create Deployment → `main`. 로컬 화면만: `npm run build -- --local` | Vercel 프로젝트 Settings에서 배포를 멈추거나 이전 배포로 Rollback합니다. 기기 하나만 막을 때는 `vault_devices`의 그 기기를 `revoked`로 바꿉니다. | Vercel에서 이전 정상 배포로 Promote/Rollback하거나, Git에서 정상 커밋을 다시 배포합니다. 메모 한 건은 `POST /api/restore/:id`, 시험 정책은 아래 「정책 복원」 |
 | 기기 승인 | `supabase/step11-devices.sql` 실행 | 화면 「이 기기 승인 요청」 → SQL Editor에서 그 기기만 `approved` → 「이 기기로 확인」 | `update public.vault_devices set status='revoked' where id='<기기 id>'` (다음 요청부터 403) | 다시 `approved`로 바꾸거나 새로 등록 |
 | 학생 판정기 `src/decider.mjs` | 설치 없음(엔진이 `decide(request)`를 부름) | 로컬 연습: `npm run decider:test`, `npm run fixture:7`, `node --test test/zone.test.mjs test/step7.test.mjs` | 엔진 쪽에서 판정기 호출을 멈춥니다(학생이 직접 멈출 수 없음). 판정기는 응답이 없거나 틀리면 엔진이 허용하지 않습니다. | `git log -- src/decider.mjs`로 정상 커밋을 찾아 그 파일만 되돌린 뒤 커밋·push |
 | 탐지 규칙 `src/detect.mjs` | 설치 없음 | 로컬 연습: `npm run detect:test`, `node --test test/detect.test.mjs` | 엔진 쪽 사건 전달을 멈춥니다. | 정상 커밋의 파일로 되돌림 |

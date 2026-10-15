@@ -316,6 +316,6 @@ async function runStep12Checks(config, options = {}) {
   const { runChecks } = await import('./checks.mjs');
   // 실행 환경이 요청 함수를 넘겨주면(options.fetch 또는 config.fetch) 그것을 쓰고, 없으면 기본 fetch를 씁니다.
   const fetchImpl = typeof options?.fetch === 'function' ? options.fetch : typeof config?.fetch === 'function' ? config.fetch : globalThis.fetch;
-  const summary = await runChecks({ appUrl: appUrl(config).href, originalApiUrl: config.originalApiUrl, fetchImpl });
+  const summary = await runChecks({ appUrl: appUrl(config).href, fetchImpl });
   return summary.attempts.map(({ attackId, expected, observed }) => ({ attackId, expected, observed }));
 }

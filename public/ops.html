@@ -63,10 +63,10 @@
       </div>
     </div>
     <p class="src" id="run-meta">아직 읽지 않았습니다.</p>
-    <p>제출 묶음(npm run bundle)과 같은 목록·같은 함수(src/checks.mjs)로 서버가 실제로 보낸 요청의 결과입니다. 쓰기 요청이 필요한 점검은 보내지 않고 not_run으로 둡니다. 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.</p>
+    <p>제출 묶음(npm run bundle)이 보낸 점검 요청을 서버가 실제로 받아 남긴 관측 기록(caseId·requestKey·상태)만으로 만든 표입니다. 관측되지 않은 점검과 쓰기 요청이 필요한 점검은 not_run입니다. 41종 공격 전체는 심판이 보내며 이 저장소에서는 실행하지 않았습니다. 표에 없는 공격을 통과로 적지 않습니다.</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>attackId</th><th>단계</th><th>기대 결과</th><th>observed</th><th>result</th><th>requestKey</th><th>확인 시각</th></tr></thead>
+        <thead><tr><th>attackId</th><th>단계</th><th>기대 결과</th><th>observed</th><th>result</th><th>requestKey</th><th>서버 관측 시각</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
@@ -107,7 +107,7 @@
       const body = await res.json();
       last = body;
       $('run-meta').textContent = `서버 확인 ${body.checkedAt} · 커밋 ${body.commit ?? '없음'} · 요청 ID ${res.headers.get('x-vercel-id') ?? '없음'} · total ${body.total} · blocked ${body.blocked} · failed ${body.failed} · notRun ${body.notRun}`;
-      $('rows').innerHTML = body.attempts.map((r) => `<tr><td><code>${esc(r.attackId)}</code></td><td>${esc(r.stage)}</td><td>${esc(r.expected)}</td><td><code>${esc(r.observed)}</code></td><td class="${r.result === 'blocked' ? 'ok' : r.result === 'failed' ? 'bad' : 'skip'}">${esc(r.result)}</td><td><code>${esc(r.alephEvidence?.requestKey ?? '')}</code></td><td>${esc(r.alephEvidence?.checkedAt ?? '')}</td></tr>`).join('');
+      $('rows').innerHTML = body.attempts.map((r) => `<tr><td><code>${esc(r.attackId)}</code></td><td>${esc(r.stage)}</td><td>${esc(r.expected)}</td><td><code>${esc(r.observed)}</code></td><td class="${r.result === 'blocked' ? 'ok' : r.result === 'failed' ? 'bad' : 'skip'}">${esc(r.result)}</td><td><code>${esc(r.alephEvidence?.requestKey ?? '')}</code></td><td>${esc(r.alephEvidence?.observedAt ?? '')}</td></tr>`).join('');
       $('download').disabled = false;
     } catch (error) {
       $('run-meta').textContent = `점검 결과를 읽지 못했습니다: ${error.message}`;
